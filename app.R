@@ -21,6 +21,12 @@ source("setup_tcga_expression.R")
 # based on analyze_BRCA_tsne_allGenes_plusCells.R
 
 code2type = c("01" = "tumor", "06" = "metastasis", "11" = "normal")
+FACET_VAR = list(NONE = "none", SAMPLE_TYPE = "sample type", PAM50 = "PAM50")
+clean_list = function(l){
+    tmp = unlist(l)
+    names(tmp) = NULL
+    tmp
+}
 
 run_tsne = function(expression_matrix, perplexity = 30){
     tsne_patient = bfcif(bfc, digest(list(expression_matrix, perplexity)), function(){
@@ -47,9 +53,10 @@ ui <- fluidPage(
         sidebarPanel(
             selectInput("sel_data", label = "TCGA data", choices = c("BRCA")),
             checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
-                               choices = c("Normal", "Tumor", "Metastasis"), 
-                               selected = c("Normal", "Tumor", "Metastasis")),
-            radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE),
+                               choices = c("normal", "tumor", "metastasis"), 
+                               selected = c("normal", "tumor", "metastasis")),
+            radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)), #c("none", "sample type", "PAM50")),
+            radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE, selected = "PAM50"),
             radioButtons("sel_color_by", label = "Color By", choices = c("sample type", "PAM50")),
             # radioButtons("sel_facet_by", label = "Facet By", choices = c("sample type", "PAM50")),
             textAreaInput("txt_genes", label = "Custom Genes", value = "paste genes here"),
@@ -242,21 +249,33 @@ server <- function(input, output, session) {
     ### Plot t-sne
     output$plot_tsne <- renderPlot({
         req(tsne_res())
+        req(input$sel_facet_var)
         tsne_dt = tsne_res()
+        
+        tsne_dt = merge(tsne_dt, meta_data(), by = "submitter_id")
         # browser()
         if(input$sel_color_by == "sample type"){ #c("sample type", "PAM50")
-            ggplot(tsne_dt, aes(x = x, y = y, color = sample_type)) + 
-                geom_point() + 
-                coord_fixed() +
-                labs(x = "", y = "", title = "t-sne of TCGA samples", subtitle = paste(input$sel_gene_list, "gene list"))
+            p = ggplot(tsne_dt, aes(x = x, y = y, color = sample_type)) 
         }else if(input$sel_color_by == "PAM50"){
-            tsne_dt = merge(tsne_dt, meta_data(), by = "submitter_id")
-            ggplot(tsne_dt, aes(x = x, y = y, color = pam_call)) + 
-                geom_point() + 
-                coord_fixed() +
-                labs(x = "", y = "", title = "t-sne of TCGA samples", subtitle = paste(input$sel_gene_list, "gene list"))
+            p = ggplot(tsne_dt, aes(x = x, y = y, color = pam_call)) 
         }else{
             stop("unrecognized input$sel_color_by: ", input$sel_color_by)
+        }
+        if(input$sel_facet_var != FACET_VAR$NONE){
+            p = p + annotate("point", x= tsne_dt$x, y = tsne_dt$y, color = 'gray70', size = .3)
+        }
+        p = p + 
+            geom_point() + 
+            coord_fixed() +
+            labs(x = "", y = "", title = "t-sne of TCGA samples", subtitle = paste(input$sel_gene_list, "gene list"))
+        if(input$sel_facet_var == FACET_VAR$NONE){
+            p
+        }else if(input$sel_facet_var == FACET_VAR$SAMPLE_TYPE){
+            p + facet_wrap(~sample_type)
+        }else if(input$sel_facet_var == FACET_VAR$PAM50){
+            p + facet_wrap(~pam_call)
+        }else{
+            stop("unrecognized input$sel_facet_var: ", input$sel_facet_var)
         }
     })
     

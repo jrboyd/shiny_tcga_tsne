@@ -156,7 +156,7 @@ if(file.exists(c_file)){
   df$sample_source = strsplit(df$entity_submitter_id, "-") %>% 
     sapply(., function(x)paste(x[1:3], collapse = "-"))
   
-  clinical_dat = fread("BRCA_clinical.tsv")
+  clinical_dat = fread("~/R/GDC-TCGA_data/BRCA_clinical.tsv")
   clinical_dat = clinical_dat[,which(!duplicated(colnames(clinical_dat))), with = FALSE]
 
     tsne_df[, submitter_id := paste(tstrsplit(bcr_patient_barcode, "-", keep = 1)[[1]], 

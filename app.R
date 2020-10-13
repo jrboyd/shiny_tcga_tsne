@@ -10,9 +10,31 @@
 library(shiny)
 library(data.table)
 library(ggplot2)
+library(BiocFileCache)
+library(digest)
+library(shinycssloaders)
+bfc = BiocFileCache()
+bfcif = ssvRecipes::bfcif
 source("setup_gene_lists.R")
+source("setup_clinical.R")
 source("setup_tcga_expression.R")
 # based on analyze_BRCA_tsne_allGenes_plusCells.R
+
+code2type = c("01" = "tumor", "06" = "metastasis", "11" = "normal")
+
+run_tsne = function(expression_matrix, perplexity = 30){
+    tsne_patient = bfcif(bfc, digest(list(expression_matrix, perplexity)), function(){
+        Rtsne::Rtsne(t(expression_matrix), 
+                     num_threads = 20, 
+                     check_duplicates = FALSE,
+                     perplexity = perplexity)    
+    })
+    
+    tsne_df = as.data.table(tsne_patient$Y)
+    colnames(tsne_df) = c("x", "y")
+    tsne_df$bcr_patient_barcode = colnames(expression_matrix)
+    tsne_df
+}
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -24,20 +46,28 @@ ui <- fluidPage(
     sidebarLayout(
         sidebarPanel(
             selectInput("sel_data", label = "TCGA data", choices = c("BRCA")),
-            radioButtons("sel_gene_list", label = "Gene List", choices = c("PAM50", "custom")),
-            textInput("txt_genes", label = "Custom Genes", value = "paste genes here")
+            checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
+                               choices = c("Normal", "Tumor", "Metastasis"), 
+                               selected = c("Normal", "Tumor", "Metastasis")),
+            radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE),
+            radioButtons("sel_color_by", label = "Color By", choices = c("sample type", "PAM50")),
+            # radioButtons("sel_facet_by", label = "Facet By", choices = c("sample type", "PAM50")),
+            textAreaInput("txt_genes", label = "Custom Genes", value = "paste genes here"),
+            selectizeInput("txtGene", label = "Select Gene To Plot", choices = NULL)
         ),
         
         # Show a plot of the generated distribution
         mainPanel(
-            plotOutput("plot_tsne")
+            withSpinner(plotOutput("plot_tsne", width = "600px", height = "600px")),
+            withSpinner(plotOutput("plot_tsne_gene", width = "600px", height = "600px"))
         )
     )
 )
 
 parse_gl = function(txt){
     gl = strsplit(txt, "[, \n]")[[1]]
-    gl[gl != ""]
+    gl = gl[gl != ""]
+    toupper(gl)
 }
 
 load_expression = function(f){
@@ -48,9 +78,10 @@ load_expression = function(f){
 }
 
 # Define server logic required to draw a histogram
-server <- function(input, output) {
+server <- function(input, output, session) {
     ### TCGA expression data
     tcga_data = reactiveVal()
+    tsne_input = reactiveVal()
     observeEvent({
         input$sel_data
     }, {
@@ -64,13 +95,47 @@ server <- function(input, output) {
         tcga_data(expression_loaded[[sel]])
     })
     observe({
-        showNotification(paste0(nrow(tcga_data()), " rows x ", ncol(tcga_data()), " columns loaded."))
+        showNotification(paste0("expression: ", nrow(tcga_data()), " rows x ", ncol(tcga_data()), " columns loaded."))
+    })
+    ### Sample Type
+    observeEvent({
+        input$sel_sample_type_filter
+        tcga_data()
+    }, {
+        req(tcga_data())
+        sample_codes = sub("[A-Z]", "", sapply(strsplit(colnames(tcga_data()), "-"), function(x)x[4]))
+        sample_types = code2type[sample_codes]
+        k = toupper(sample_types) %in% toupper(input$sel_sample_type_filter)
+        # tsne_dt[, sample_code := tstrsplit(bcr_patient_barcode, "-", keep = 4)]
+        # tsne_dt[, sample_code := sub("[A-Z]", "", sample_code)]
+        # tsne_dt[, sample_type := code2type[sample_code]]
+        tsne_input(tcga_data()[, k])
+        tsne_res(NULL)
+    })
+    
+    
+    ### patient metadata
+    meta_data = reactiveVal()
+    observeEvent({
+        input$sel_data
+    }, {
+        sel = input$sel_data
+        if(!sel %in% names(clinical_loaded)){
+            stop(sel, " not found in loaded metadata.")
+        }
+        # if(is.null(clinical_loaded[[sel]])){
+        #     clinical_loaded[[sel]] = load_metadata(clinical_files[[sel]])
+        # }
+        meta_data(clinical_loaded[[sel]])
+    })
+    observe({
+        showNotification(paste0("metadata: ", nrow(meta_data()), " rows x ", ncol(meta_data()), " columns loaded."))
     })
     
     ### Genes to use in t-sne
     input_genes = reactiveVal()
     tsne_genes = reactiveVal()
-    
+    ## watch gene inputs
     observeEvent({
         input$sel_gene_list
         input$txt_genes
@@ -87,21 +152,47 @@ server <- function(input, output) {
         gl = sort(unique(gl))
         input_genes(gl)
     })
+    ##
+    vis_gene = reactiveVal()
+    observeEvent({
+        tcga_data()
+    }, {
+        req(tcga_data())
+        def = vis_gene()
+        if(is.null(def)) def = ""
+        all_genes = rownames(tcga_data())
+        if(def %in% all_genes){
+            updateSelectizeInput(session, 'txtGene', choices = all_genes, selected = def, server = TRUE)
+        }else{
+            updateSelectizeInput(session, 'txtGene', choices = all_genes, server = TRUE)
+        }
+        
+    })
+    observeEvent({
+        input$txtGene   
+        tcga_data()
+    }, {
+        req(tcga_data())
+        if(input$txtGene %in% rownames(tcga_data())){
+            vis_gene(input$txtGene)
+        }
+    })
     
+    ## compare input genes with available expression data
     observeEvent({
         tcga_data()
         input_genes()
     }, {
         req(tcga_data())
         gl = input_genes()
-
+        
         missed = setdiff(gl, rownames(tcga_data()))
         if(length(missed) > 0){
             showNotification(paste("genes not present in TCGA:", paste(missed, collapse = ", ")), type = "warning")
         }
         tsne_genes(setdiff(gl, missed))
     })
-    
+    ## notify about genes loaded
     observeEvent({
         tsne_genes()
     }, {
@@ -111,20 +202,77 @@ server <- function(input, output) {
     ### Running t-sne
     tsne_res = reactiveVal()
     observeEvent({
-        tcga_data()
+        # tcga_data()
+        tsne_input()
         tsne_genes()
     }, {
-        
+        expr_mat = tsne_input()
+        gl = tsne_genes()
+        if(length(gl) > 0){
+            tsne_worked = tryCatch({
+                tsne_dt = run_tsne(expr_mat[gl,])    
+                TRUE
+            }, error = function(e){
+                
+                FALSE
+            })
+            if(tsne_worked){
+                regx = regexpr("^.{4}-.{2}-.{4}", tsne_dt$bcr_patient_barcode)
+                tsne_dt$submitter_id = regmatches(tsne_dt$bcr_patient_barcode, regx)
+                tsne_dt[, sample_code := tstrsplit(bcr_patient_barcode, "-", keep = 4)]
+                tsne_dt[, sample_code := sub("[A-Z]", "", sample_code)]
+                tsne_dt[, sample_type := code2type[sample_code]]
+                # tsne_dt$sample_code %>% table
+                # tsne_dt$sample_type %>% table
+                
+                tsne_dt[, x := scales::rescale(x, c(-.5, .5))]
+                tsne_dt[, y := scales::rescale(y, c(-.5, .5))]
+                
+                tsne_res(tsne_dt) 
+            }else{
+                showNotification("Need more valid genes/samples to run t-sne.", type = "error")
+                tsne_res(NULL)
+            }
+            
+        }else{
+            tsne_res(NULL)
+        }
     })
     
     ### Plot t-sne
     output$plot_tsne <- renderPlot({
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = 10 + 1)
+        req(tsne_res())
+        tsne_dt = tsne_res()
+        # browser()
+        if(input$sel_color_by == "sample type"){ #c("sample type", "PAM50")
+            ggplot(tsne_dt, aes(x = x, y = y, color = sample_type)) + 
+                geom_point() + 
+                coord_fixed() +
+                labs(x = "", y = "", title = "t-sne of TCGA samples", subtitle = paste(input$sel_gene_list, "gene list"))
+        }else if(input$sel_color_by == "PAM50"){
+            tsne_dt = merge(tsne_dt, meta_data(), by = "submitter_id")
+            ggplot(tsne_dt, aes(x = x, y = y, color = pam_call)) + 
+                geom_point() + 
+                coord_fixed() +
+                labs(x = "", y = "", title = "t-sne of TCGA samples", subtitle = paste(input$sel_gene_list, "gene list"))
+        }else{
+            stop("unrecognized input$sel_color_by: ", input$sel_color_by)
+        }
+    })
+    
+    output$plot_tsne_gene = renderPlot({
+        req(tsne_res())
+        tsne_dt = tsne_res()
+        req(vis_gene())
+        # browser()
+        gene_vals = tcga_data()[vis_gene(),]
+        tsne_dt$gene_val = gene_vals[tsne_dt$bcr_patient_barcode]
+        ggplot(tsne_dt, aes(x = x, y = y, color = log10(gene_val + 1))) + 
+            geom_point() + 
+            coord_fixed() +
+            labs(x = "", y = "", title = paste(vis_gene(), "expression"), subtitle = "log10 scale") +
+            scale_color_viridis_c()
         
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white')
     })
 }
 

@@ -18,6 +18,7 @@ bfcif = ssvRecipes::bfcif
 source("setup_gene_lists.R")
 source("setup_clinical.R")
 source("setup_tcga_expression.R")
+source("functions.R")
 # based on analyze_BRCA_tsne_allGenes_plusCells.R
 
 code2type = c("01" = "tumor", "06" = "metastasis", "11" = "normal")
@@ -28,7 +29,14 @@ clean_list = function(l){
     tmp
 }
 
+ex_files = dir("example_data", full.names = TRUE)
+names(ex_files) = basename(ex_files)
+
 run_tsne = function(expression_matrix, perplexity = 30){
+    if(perplexity > ncol(expression_matrix)/4){
+        warning("auto reducing perplexity")
+        perplexity = round(ncol(expression_matrix)/4)
+    }
     tsne_patient = bfcif(bfc, digest(list(expression_matrix, perplexity)), function(){
         Rtsne::Rtsne(t(expression_matrix), 
                      num_threads = 20, 
@@ -47,42 +55,57 @@ ui <- fluidPage(
     
     # Application title
     titlePanel("TCGA t-sne"),
-    
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            selectInput("sel_data", label = "TCGA data", choices = c("BRCA")),
-            checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
-                               choices = c("normal", "tumor", "metastasis"), 
-                               selected = c("normal", "tumor", "metastasis")),
-            radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)), #c("none", "sample type", "PAM50")),
-            radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE, selected = "PAM50"),
-            radioButtons("sel_color_by", label = "Color By", choices = c("sample type", "PAM50")),
-            # radioButtons("sel_facet_by", label = "Facet By", choices = c("sample type", "PAM50")),
-            textAreaInput("txt_genes", label = "Custom Genes", value = "paste genes here"),
-            selectizeInput("txtGene", label = "Select Gene To Plot", choices = NULL)
+    tabsetPanel(
+        tabPanel("Main",
+                 # Sidebar with a slider input for number of bins 
+                 sidebarLayout(
+                     sidebarPanel(
+                         selectInput("sel_data", label = "TCGA data", choices = c("BRCA")),
+                         checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
+                                            choices = c("normal", "tumor", "metastasis"), 
+                                            selected = c("normal", "tumor", "metastasis")),
+                         radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)), #c("none", "sample type", "PAM50")),
+                         radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE, selected = "PAM50"),
+                         radioButtons("sel_color_by", label = "Color By", choices = c("sample type", "PAM50")),
+                         # radioButtons("sel_facet_by", label = "Facet By", choices = c("sample type", "PAM50")),
+                         
+                         selectizeInput("txtGene", label = "Select Gene To Plot", choices = NULL),
+                         
+                     ),
+                     
+                     # Show a plot of the generated distribution
+                     mainPanel(
+                         withSpinner(plotOutput("plot_tsne", width = "600px", height = "600px")),
+                         withSpinner(plotOutput("plot_tsne_gene", width = "600px", height = "600px"))
+                     )
+                 )
         ),
-        
-        # Show a plot of the generated distribution
-        mainPanel(
-            withSpinner(plotOutput("plot_tsne", width = "600px", height = "600px")),
-            withSpinner(plotOutput("plot_tsne_gene", width = "600px", height = "600px"))
+        tabPanel("Add Gene Set",
+                 
+                 sidebarLayout(
+                     sidebarPanel(
+                         tabsetPanel(
+                             id = "gene_list_method",
+                             tabPanel("Paste",
+                                      textAreaInput("txt_genes", label = "Custom Genes", value = "paste genes here")#,
+                             ),
+                             tabPanel("Upload",
+                                      fileInput(inputId = "BtnUploadPeakfile", label = "Browse Local Files"),
+                                      actionButton("btnExampleData", label = "use example data"),
+                                      selectInput("selExampleData", label = "select example data", choices = ex_files)    
+                                      
+                             )
+                         )
+                     ),
+                     mainPanel(
+                         DT::dataTableOutput("DT_PasteGenes_DataFrame")
+                     )
+                 )
         )
+        
     )
 )
 
-parse_gl = function(txt){
-    gl = strsplit(txt, "[, \n]")[[1]]
-    gl = gl[gl != ""]
-    toupper(gl)
-}
-
-load_expression = function(f){
-    dat = fread(f)
-    mat = as.matrix(dat[,-1])
-    rownames(mat) = dat$gene_name
-    mat
-}
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
@@ -141,23 +164,55 @@ server <- function(input, output, session) {
     
     ### Genes to use in t-sne
     input_genes = reactiveVal()
-    tsne_genes = reactiveVal()
+    parsed_genes = reactiveVal()
+    valid_genes = reactiveVal()
+    
     ## watch gene inputs
     observeEvent({
         input$sel_gene_list
-        input$txt_genes
+        # input$txt_genes
     }, {
         sel = input$sel_gene_list
         gl = NULL
-        if(!sel %in% names(gene_lists)){
-            gl = parse_gl(input$txt_genes)
-            # stop(sel, " not found in gene lists.")
-        }else{
-            gl = gene_lists[[sel]]
-        }
+        gl = gene_lists[[sel]]
         # message(paste(gl, collapse = ", "))
         gl = sort(unique(gl))
         input_genes(gl)
+    })
+    
+    observeEvent({
+        input$txt_genes
+    }, {
+        gl = parse_gl(input$txt_genes)
+        parsed_genes(gl)
+    })
+    
+    gene_table = reactiveVal()
+    
+    observe({
+        gl = parsed_genes()
+        if(is.null(gl)){
+            gene_table(data.frame())  
+        }else if(length(gl) == 0){
+            gene_table(data.frame())  
+        }else{
+            gene_table(data.frame(gene_name = gl))
+        }
+    })
+    
+    observe({
+        df = PreviewSet_DataFrame()
+        if(is.null(df)){
+            gene_table(data.frame())  
+        }else if(nrow(df) == 0){
+            gene_table(data.frame())
+        }else{
+            gene_table(df)
+        }
+    })
+    
+    output$DT_PasteGenes_DataFrame = DT::renderDataTable({
+        DT::datatable(gene_table())    
     })
     ##
     vis_gene = reactiveVal()
@@ -197,13 +252,13 @@ server <- function(input, output, session) {
         if(length(missed) > 0){
             showNotification(paste("genes not present in TCGA:", paste(missed, collapse = ", ")), type = "warning")
         }
-        tsne_genes(setdiff(gl, missed))
+        valid_genes(setdiff(gl, missed))
     })
     ## notify about genes loaded
     observeEvent({
-        tsne_genes()
+        valid_genes()
     }, {
-        showNotification(paste0(length(tsne_genes()), " genes loaded from ", input$sel_gene_list, "."))
+        showNotification(paste0(length(valid_genes()), " genes loaded from ", input$sel_gene_list, "."))
     })
     
     ### Running t-sne
@@ -211,10 +266,10 @@ server <- function(input, output, session) {
     observeEvent({
         # tcga_data()
         tsne_input()
-        tsne_genes()
+        valid_genes()
     }, {
         expr_mat = tsne_input()
-        gl = tsne_genes()
+        gl = valid_genes()
         if(length(gl) > 0){
             tsne_worked = tryCatch({
                 tsne_dt = run_tsne(expr_mat[gl,])    
@@ -292,6 +347,65 @@ server <- function(input, output, session) {
             labs(x = "", y = "", title = paste(vis_gene(), "expression"), subtitle = "log10 scale") +
             scale_color_viridis_c()
         
+    })
+    
+    ### File Upload
+    #Set Preview reactives
+    PreviewSet_Filepath = reactiveVal(value = "", label = "PreviewSet_Filepath")
+    PreviewSet_Name = reactiveVal(value = "", label = "PreviewSet_Name")
+    PreviewSet_DataFrame = reactiveVal()
+    # PreviewSet_DataFrame = reactive({
+    #     showNotification(PreviewSet_Filepath())
+    #     if(is.null(PreviewSet_Filepath())) return(NULL)
+    #     if(PreviewSet_Filepath() == "") return(NULL)
+    #     browser()
+    #     load_peak_wValidation(PreviewSet_Filepath(), with_notes = T)
+    # })
+    observeEvent({
+        PreviewSet_Filepath()
+        PreviewSet_Name()
+    }, {
+        if(PreviewSet_Filepath() == ""){
+            PreviewSet_DataFrame(NULL)
+        }else{
+            # browser()
+            # fread(PreviewSet_Filepath())
+            ##TODO load a DESEQ file or other gene list
+            showNotification(paste0("loading ", PreviewSet_Name()))
+            out = decide_parse_FUN(PreviewSet_Filepath(), PreviewSet_Name())
+            PreviewSet_DataFrame(out)
+        }
+    })
+    
+    observeEvent(input$BtnUploadPeakfile, {
+        PreviewSet_Filepath(input$BtnUploadPeakfile$datapath)
+        PreviewSet_Name(input$BtnUploadPeakfile$name)
+    })
+    
+    observeEvent(input$BtnCancelFile, {
+        PreviewSet_Filepath("")
+        PreviewSet_Name("")
+    })
+    
+    observeEvent(input$btnExampleData,
+                 {
+                     PreviewSet_Filepath(input$selExampleData)
+                     PreviewSet_Name(names(ex_files)[which(input$selExampleData == ex_files)])
+                 })
+    
+    observeEvent(
+        PreviewSet_DataFrame(),
+        {
+            req(PreviewSet_DataFrame())
+            # showModal(modalDialog( size = "l",
+            #     DT::dataTableOutput("DT_UploadGenes_DataFrame")
+            #     
+            # ))
+        }
+    )
+    
+    output$DT_UploadGenes_DataFrame = DT::renderDataTable({
+        DT::datatable(PreviewSet_DataFrame()[[1]], options = list(scrollX = TRUE))  
     })
 }
 

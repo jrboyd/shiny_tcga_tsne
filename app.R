@@ -17,6 +17,7 @@ library(shinycssloaders)
 source("setup_gene_lists.R")
 source("setup_clinical.R")
 source("setup_tcga_expression.R")
+source("app_module_expression_matrix.R")
 source("app_module_upload.R")
 source("app_module_tsne.R")
 source("app_module_gene_xy_vis.R")
@@ -102,56 +103,7 @@ server <- function(input, output, session) {
     gene_table = reactiveVal()
     #metadata for patient entries
     meta_data = reactiveVal()
-    
-    observeEvent({
-        input$sel_data
-    }, {
-        sel = input$sel_data
-        if(!sel %in% names(expression_files)){
-            stop(sel, " not found in expression_files.")
-        }
-        if(is.null(expression_loaded[[sel]])){
-            expression_loaded[[sel]] = load_expression(expression_files[[sel]])
-        }
-        tcga_data(expression_loaded[[sel]])
-    })
-    observe({
-        showNotification(paste0("expression: ", nrow(tcga_data()), " rows x ", ncol(tcga_data()), " columns loaded."))
-    })
-    ### Sample Type
-    observeEvent({
-        input$sel_sample_type_filter
-        tcga_data()
-    }, {
-        req(tcga_data())
-        sample_codes = sub("[A-Z]", "", sapply(strsplit(colnames(tcga_data()), "-"), function(x)x[4]))
-        sample_types = code2type[sample_codes]
-        k = toupper(sample_types) %in% toupper(input$sel_sample_type_filter)
-        # tsne_dt[, sample_code := tstrsplit(bcr_patient_barcode, "-", keep = 4)]
-        # tsne_dt[, sample_code := sub("[A-Z]", "", sample_code)]
-        # tsne_dt[, sample_type := code2type[sample_code]]
-        tsne_input(tcga_data()[, k])
-        tsne_res(NULL)
-    })
-    
-    
-    ### patient metadata
-    observeEvent({
-        input$sel_data
-    }, {
-        sel = input$sel_data
-        if(!sel %in% names(clinical_loaded)){
-            stop(sel, " not found in loaded metadata.")
-        }
-        # if(is.null(clinical_loaded[[sel]])){
-        #     clinical_loaded[[sel]] = load_metadata(clinical_files[[sel]])
-        # }
-        meta_data(clinical_loaded[[sel]])
-    })
-    observe({
-        showNotification(paste0("metadata: ", nrow(meta_data()), " rows x ", ncol(meta_data()), " columns loaded."))
-    })
-    
+    tsne_res = reactiveVal()
     
     
     ## watch gene inputs
@@ -239,10 +191,18 @@ server <- function(input, output, session) {
         showNotification(paste0(length(valid_genes()), " genes loaded from ", input$sel_gene_list, "."))
     })
     
-    
-    tsne_res = server_tsne(input, output, session, tsne_input, valid_genes, meta_data, code2type, FACET_VAR)
+
+    server_tsne(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, code2type, FACET_VAR)
+    server_expression_matrix(input, output, session,
+                             expression_files,
+                             expression_loaded,
+                             tcga_data,
+                             clinical_loaded,
+                             meta_data,
+                             code2type,
+                             tsne_input,
+                             tsne_res)
     server_gene_xy(input, output, session, tsne_res, tcga_data, vis_gene)
-    
     server_upload(input, output, session, gene_table)
     
 }

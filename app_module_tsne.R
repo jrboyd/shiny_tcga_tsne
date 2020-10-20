@@ -20,9 +20,9 @@ run_tsne = function(expression_matrix, perplexity = 30){
     tsne_df
 }
  
-server_tsne = function(input, output, session, tsne_input, valid_genes, meta_data, code2type, FACET_VAR){
+server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, code2type, FACET_VAR){
     ### Running t-sne
-    tsne_res = reactiveVal()
+    
     observeEvent({
         # tcga_data()
         tsne_input()

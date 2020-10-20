@@ -18,6 +18,7 @@ bfcif = ssvRecipes::bfcif
 source("setup_gene_lists.R")
 source("setup_clinical.R")
 source("setup_tcga_expression.R")
+source("app_module_upload.R")
 source("functions.R")
 # based on analyze_BRCA_tsne_allGenes_plusCells.R
 
@@ -29,8 +30,7 @@ clean_list = function(l){
     tmp
 }
 
-ex_files = dir("example_data", full.names = TRUE)
-names(ex_files) = basename(ex_files)
+
 
 run_tsne = function(expression_matrix, perplexity = 30){
     if(perplexity > ncol(expression_matrix)/4){
@@ -86,15 +86,10 @@ ui <- fluidPage(
                      sidebarPanel(
                          tabsetPanel(
                              id = "gene_list_method",
-                             tabPanel("Paste",
+                             tabPanel("Paste", value = "paste",
                                       textAreaInput("txt_genes", label = "Custom Genes", value = "paste genes here")#,
                              ),
-                             tabPanel("Upload",
-                                      fileInput(inputId = "BtnUploadPeakfile", label = "Browse Local Files"),
-                                      actionButton("btnExampleData", label = "use example data"),
-                                      selectInput("selExampleData", label = "select example data", choices = ex_files)    
-                                      
-                             )
+                             ui_upload()
                          )
                      ),
                      mainPanel(
@@ -190,26 +185,22 @@ server <- function(input, output, session) {
     gene_table = reactiveVal()
     
     observe({
-        gl = parsed_genes()
-        if(is.null(gl)){
-            gene_table(data.frame())  
-        }else if(length(gl) == 0){
-            gene_table(data.frame())  
-        }else{
-            gene_table(data.frame(gene_name = gl))
+      
+        if(input$gene_list_method == "paste"){
+            showNotification("DEBUG list by paste")
+            gl = parsed_genes()
+            if(is.null(gl)){
+                gene_table(data.frame())  
+            }else if(length(gl) == 0){
+                gene_table(data.frame())  
+            }else{
+                gene_table(data.frame(gene_name = gl))
+            }    
         }
+        
     })
     
-    observe({
-        df = PreviewSet_DataFrame()
-        if(is.null(df)){
-            gene_table(data.frame())  
-        }else if(nrow(df) == 0){
-            gene_table(data.frame())
-        }else{
-            gene_table(df)
-        }
-    })
+
     
     output$DT_PasteGenes_DataFrame = DT::renderDataTable({
         DT::datatable(gene_table())    
@@ -349,64 +340,7 @@ server <- function(input, output, session) {
         
     })
     
-    ### File Upload
-    #Set Preview reactives
-    PreviewSet_Filepath = reactiveVal(value = "", label = "PreviewSet_Filepath")
-    PreviewSet_Name = reactiveVal(value = "", label = "PreviewSet_Name")
-    PreviewSet_DataFrame = reactiveVal()
-    # PreviewSet_DataFrame = reactive({
-    #     showNotification(PreviewSet_Filepath())
-    #     if(is.null(PreviewSet_Filepath())) return(NULL)
-    #     if(PreviewSet_Filepath() == "") return(NULL)
-    #     browser()
-    #     load_peak_wValidation(PreviewSet_Filepath(), with_notes = T)
-    # })
-    observeEvent({
-        PreviewSet_Filepath()
-        PreviewSet_Name()
-    }, {
-        if(PreviewSet_Filepath() == ""){
-            PreviewSet_DataFrame(NULL)
-        }else{
-            # browser()
-            # fread(PreviewSet_Filepath())
-            ##TODO load a DESEQ file or other gene list
-            showNotification(paste0("loading ", PreviewSet_Name()))
-            out = decide_parse_FUN(PreviewSet_Filepath(), PreviewSet_Name())
-            PreviewSet_DataFrame(out)
-        }
-    })
-    
-    observeEvent(input$BtnUploadPeakfile, {
-        PreviewSet_Filepath(input$BtnUploadPeakfile$datapath)
-        PreviewSet_Name(input$BtnUploadPeakfile$name)
-    })
-    
-    observeEvent(input$BtnCancelFile, {
-        PreviewSet_Filepath("")
-        PreviewSet_Name("")
-    })
-    
-    observeEvent(input$btnExampleData,
-                 {
-                     PreviewSet_Filepath(input$selExampleData)
-                     PreviewSet_Name(names(ex_files)[which(input$selExampleData == ex_files)])
-                 })
-    
-    observeEvent(
-        PreviewSet_DataFrame(),
-        {
-            req(PreviewSet_DataFrame())
-            # showModal(modalDialog( size = "l",
-            #     DT::dataTableOutput("DT_UploadGenes_DataFrame")
-            #     
-            # ))
-        }
-    )
-    
-    output$DT_UploadGenes_DataFrame = DT::renderDataTable({
-        DT::datatable(PreviewSet_DataFrame()[[1]], options = list(scrollX = TRUE))  
-    })
+    server_upload(input, output, session, gene_table)
 }
 
 # Run the application 

@@ -27,7 +27,7 @@ ui_upload = function(){
 
 }
 
-server_upload = function(input, output, session, gene_table){
+server_upload = function(input, output, session, gene_table, tcga_data){
     ### File Upload
     #Set Preview reactives
     PreviewSet_Filepath = reactiveVal(value = "", label = "PreviewSet_Filepath")
@@ -93,7 +93,7 @@ server_upload = function(input, output, session, gene_table){
         }
     })
     
-    #Pasting genes
+    ### Pasting genes
     #genes parsed for paste/upload
     parsed_genes = reactiveVal()
     observeEvent({
@@ -116,5 +116,22 @@ server_upload = function(input, output, session, gene_table){
             }    
         }
         
+    })
+    
+    ### Show table
+    output$DT_PasteGenes_DataFrame = DT::renderDataTable({
+        df = gene_table()
+        df = as.data.frame(df)
+        valid_genes = rownames(tcga_data())
+        # browser()
+        if(nrow(df) > 0){
+           
+            df = locate_genes_in_df(df, valid_genes)
+            df = validate_genes_in_df(df, valid_genes)    
+        }else{
+            df = data.table(A = "please upload data")
+        }
+        
+        DT::datatable(df)    
     })
 }

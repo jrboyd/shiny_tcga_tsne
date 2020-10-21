@@ -111,7 +111,7 @@ locate_genes_in_df = function(df, valid_genes){
     if(!is.null(gene_col)){
         setnames(df, gene_col, "gene_name")
     }else{
-        warning("could not locate valid_genes in provided data.")
+        warning("could not locate valid genes in provided data.")
     }
     df
 }
@@ -127,10 +127,14 @@ locate_genes_in_df = function(df, valid_genes){
 #'
 #' @examples
 validate_genes_in_df = function(df, valid_genes, valid_var = "valid"){
-    stopifnot("gene_name" %in% colnames(df))
+    # stopifnot("gene_name" %in% colnames(df))
+    if(is.null(df[["gene_name"]])){
+        df$gene_name = "missing"   
+    }
     df[[valid_var]] = df$gene_name %in% valid_genes
     var = c("gene_name", "valid")
-    df = df[, c(var, setdiff(colnames(df), var))]
+    
+    df = df[, c(var, setdiff(colnames(df), var))]    
     df
 }
 

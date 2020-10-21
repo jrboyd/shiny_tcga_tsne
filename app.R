@@ -97,9 +97,7 @@ server <- function(input, output, session) {
         input_genes(gl)
     })
     
-    output$DT_PasteGenes_DataFrame = DT::renderDataTable({
-        DT::datatable(gene_table())    
-    })
+
     ##
     vis_gene = reactiveVal()
     observeEvent({
@@ -159,7 +157,7 @@ server <- function(input, output, session) {
                              tsne_input,
                              tsne_res)
     server_gene_xy(input, output, session, tsne_res, tcga_data, vis_gene)
-    server_upload(input, output, session, gene_table)
+    server_upload(input, output, session, gene_table, tcga_data)
     
     
 }

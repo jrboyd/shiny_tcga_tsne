@@ -76,6 +76,130 @@ parse_xlsx = function(f, name){
     }
 }
 
+#' get class for every column in df
+#'
+#' @param df 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_column_classes = function(df){
+    sapply(df, class)
+}
+
+#' locate the first column in df containing valid_genes
+#' enforces gene_name as column name
+#'
+#' @param df 
+#' @param valid_genes 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+locate_genes_in_df = function(df, valid_genes){
+    to_check = colnames(df)[get_column_classes(df) %in% c("character", "factor")]    
+    gene_col = NULL
+    for(tc in to_check){
+        if(any(toupper(df[[tc]]) %in% valid_genes)){
+            gene_col = tc
+            break
+        }
+    }
+    message(gene_col)
+    if(!is.null(gene_col)){
+        setnames(df, gene_col, "gene_name")
+    }else{
+        warning("could not locate valid_genes in provided data.")
+    }
+    df
+}
+
+#' determine which genes in gene_name are valid
+#'
+#' @param df 
+#' @param valid_genes 
+#' @param valid_var 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+validate_genes_in_df = function(df, valid_genes, valid_var = "valid"){
+    stopifnot("gene_name" %in% colnames(df))
+    df[[valid_var]] = df$gene_name %in% valid_genes
+    var = c("gene_name", "valid")
+    df = df[, c(var, setdiff(colnames(df), var))]
+    df
+}
+
+
+sampleCap = function(x, n = 500){
+    n = min(n, length(unique(x)))
+    out = sample(unique(x), n)
+    if(is.factor(out)) out = as.character(out)
+    out
+}
+
+#from seqtsne
+nn_clust = function(tsne_res, nsamp = Inf, nn = 100, auto_nn_fraction = 5, id_var = "submitter_id", x_var = "x", y_var = "y"){
+    # tsne_res[, tid := paste(tall_var, id)]
+    tsne_res[["tid"]] = tsne_res[[id_var]]
+    tsne_res[["tx"]] = tsne_res[[x_var]]
+    tsne_res[["ty"]] = tsne_res[[y_var]]
+    
+    if(auto_nn_fraction*nn > nrow(tsne_res)){
+        warning("Automatically reducing nearest neighbors")
+        nn = nrow(tsne_res)/auto_nn_fraction
+        if(nn < 1){
+            stop("not enough samples to cluster. ", nrow(tsne_res), " samples submitted.")
+        }
+    }
+    
+    mat = t(as.matrix(tsne_res[, .(tx, ty)]))
+    colnames(mat) = tsne_res$tid
+    mat = mat[, sampleCap(seq(ncol(mat)), nsamp)]
+    knn.info <- RANN::nn2(t(mat), k=nn)
+    knn <- knn.info$nn.idx
+    colnames(knn) = c("tid", paste0("V", seq(nn-1)))
+    knn = as.data.table(knn)
+    mknn = melt(knn, id.vars = "tid")
+    
+    # adj <- matrix(0, ncol(mat), ncol(mat))
+    # rownames(adj) <- colnames(adj) <- colnames(mat)
+    # for(i in seq_len(ncol(mat))) {
+    #     adj[i,colnames(mat)[knn[i,]]] <- 1
+    # }
+    ADJ = Matrix::Matrix(0, ncol(mat), ncol(mat))
+    ADJ[cbind(mknn$tid, mknn$value)] = 1
+    rownames(ADJ) = colnames(mat)
+    colnames(ADJ) = colnames(mat)
+    g <- igraph::graph.adjacency(ADJ, mode="undirected")
+    g <- igraph::simplify(g) ## remove self loops
+    # V(g)$color <- rainbow(G)[group[names(V(g))]] ## color nodes by group
+    # plot(g, vertex.label=NA)
+    km <- igraph::cluster_walktrap(g)
+    ## community membership
+    com <- km$membership
+    names(com) <- km$names
+    com_dt = data.table(tid = names(com), cluster_id = paste("cluster", com))
+    
+    p_dt = merge(tsne_res, com_dt, by = "tid")
+    # p_dt[, coms := paste("cluster", com)]
+    # ggplot(p_dt, aes(x = tx, y = ty, color = coms)) +
+    #     annotate("point", x  = p_dt$tx, y = p_dt$ty, size = .2) +
+    #     geom_point(size = .5) +
+    #     facet_wrap("coms")
+    
+    setnames(p_dt, c("tx", "ty"), c(x_var, y_var))
+    p = ggplot(p_dt, aes_string(x = x_var, y = y_var, color = "cluster_id")) +
+        labs(color = "cluster_id") +
+        # annotate("point", x  = p_dt$tx, y = p_dt$ty, size = .2) +
+        geom_point(size = .5) #+
+    # facet_wrap("coms")
+    return(list(data = p_dt, plot = p))
+}
 # ex_files = dir("example_data", full.names = TRUE)
 # # funs = lapply(ex_files, decide_parse_FUN)
 # lapply(ex_files, function(f){

@@ -3,12 +3,28 @@ ex_files = dir("example_data", full.names = TRUE)
 names(ex_files) = basename(ex_files)
 
 ui_upload = function(){
-    tabPanel("Upload", value = "upload",
-             fileInput(inputId = "BtnUploadPeakfile", label = "Browse Local Files"),
-             actionButton("btnExampleData", label = "use example data"),
-             selectInput("selExampleData", label = "select example data", choices = ex_files)    
-             
+    
+    sidebarLayout(
+        sidebarPanel(
+            tabsetPanel(
+                id = "gene_list_method",
+                tabPanel("Paste", value = "paste",
+                         textAreaInput("txt_genes", label = "Custom Genes", value = "paste genes here")#,
+                ),
+                tabPanel("Upload", value = "upload",
+                         fileInput(inputId = "BtnUploadPeakfile", label = "Browse Local Files"),
+                         actionButton("btnExampleData", label = "use example data"),
+                         selectInput("selExampleData", label = "select example data", choices = ex_files)    
+                         
+                )
+                
+            )
+        ),
+        mainPanel(
+            DT::dataTableOutput("DT_PasteGenes_DataFrame")
+        )
     )
+
 }
 
 server_upload = function(input, output, session, gene_table){
@@ -75,5 +91,30 @@ server_upload = function(input, output, session, gene_table){
                 gene_table(df)
             }
         }
+    })
+    
+    #Pasting genes
+    #genes parsed for paste/upload
+    parsed_genes = reactiveVal()
+    observeEvent({
+        input$txt_genes
+    }, {
+        gl = parse_gl(input$txt_genes)
+        parsed_genes(gl)
+    })
+    
+    observe({
+        if(input$gene_list_method == "paste"){
+            showNotification("DEBUG list by paste")
+            gl = parsed_genes()
+            if(is.null(gl)){
+                gene_table(data.frame())  
+            }else if(length(gl) == 0){
+                gene_table(data.frame())  
+            }else{
+                gene_table(data.frame(gene_name = gl))
+            }    
+        }
+        
     })
 }

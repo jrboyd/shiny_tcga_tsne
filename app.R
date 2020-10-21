@@ -38,7 +38,6 @@ clean_list = function(l){
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-    
     # Application title
     titlePanel("TCGA t-sne"),
     tabsetPanel(
@@ -56,10 +55,7 @@ ui <- fluidPage(
                          # radioButtons("sel_facet_by", label = "Facet By", choices = c("sample type", "PAM50")),
                          
                          selectizeInput("txtGene", label = "Select Gene To Plot", choices = NULL),
-                         
                      ),
-                     
-                     # Show a plot of the generated distribution
                      mainPanel(
                          withSpinner(plotOutput("plot_tsne", width = "600px", height = "600px")),
                          withSpinner(plotOutput("plot_tsne_gene", width = "600px", height = "600px"))
@@ -67,23 +63,8 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Add Gene Set",
-                 
-                 sidebarLayout(
-                     sidebarPanel(
-                         tabsetPanel(
-                             id = "gene_list_method",
-                             tabPanel("Paste", value = "paste",
-                                      textAreaInput("txt_genes", label = "Custom Genes", value = "paste genes here")#,
-                             ),
-                             ui_upload()
-                         )
-                     ),
-                     mainPanel(
-                         DT::dataTableOutput("DT_PasteGenes_DataFrame")
-                     )
-                 )
+                 ui_upload()
         )
-        
     )
 )
 
@@ -95,8 +76,6 @@ server <- function(input, output, session) {
     tsne_input = reactiveVal()
     ### Genes to use in t-sne
     input_genes = reactiveVal()
-    #genes parsed for paste/upload
-    parsed_genes = reactiveVal()
     #subset of parsed genes in tcga expression data
     valid_genes = reactiveVal()
     #table shown in Add Gene Set main panel, includes parsed genes and other data used for selection
@@ -104,7 +83,6 @@ server <- function(input, output, session) {
     #metadata for patient entries
     meta_data = reactiveVal()
     tsne_res = reactiveVal()
-    
     
     ## watch gene inputs
     observeEvent({
@@ -117,28 +95,6 @@ server <- function(input, output, session) {
         # message(paste(gl, collapse = ", "))
         gl = sort(unique(gl))
         input_genes(gl)
-    })
-    
-    observeEvent({
-        input$txt_genes
-    }, {
-        gl = parse_gl(input$txt_genes)
-        parsed_genes(gl)
-    })
-    
-    observe({
-        if(input$gene_list_method == "paste"){
-            showNotification("DEBUG list by paste")
-            gl = parsed_genes()
-            if(is.null(gl)){
-                gene_table(data.frame())  
-            }else if(length(gl) == 0){
-                gene_table(data.frame())  
-            }else{
-                gene_table(data.frame(gene_name = gl))
-            }    
-        }
-        
     })
     
     output$DT_PasteGenes_DataFrame = DT::renderDataTable({
@@ -191,7 +147,7 @@ server <- function(input, output, session) {
         showNotification(paste0(length(valid_genes()), " genes loaded from ", input$sel_gene_list, "."))
     })
     
-
+    
     server_tsne(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, code2type, FACET_VAR)
     server_expression_matrix(input, output, session,
                              expression_files,
@@ -204,6 +160,7 @@ server <- function(input, output, session) {
                              tsne_res)
     server_gene_xy(input, output, session, tsne_res, tcga_data, vis_gene)
     server_upload(input, output, session, gene_table)
+    
     
 }
 

@@ -6,6 +6,14 @@ ui_upload = function(){
     
     sidebarLayout(
         sidebarPanel(
+            tags$h3("TODO: gene set import/export"),
+            tags$h3("TODO: filtering after upload"),
+            tags$h3("TODO: hide example data"),
+            fluidRow(
+                column(textInput("txt_gene_set_name", label = "Gene set name", value = "custom"), width = 9),
+                column(actionButton("btn_add_gene_set", label = "Add"), width = 3, style = "margin-top: 24px;",)
+            ),
+            tags$hr(),
             tabsetPanel(
                 id = "gene_list_method",
                 tabPanel("Paste", value = "paste",
@@ -18,16 +26,17 @@ ui_upload = function(){
                          
                 )
                 
-            )
+            ),
+            uiOutput("rpt_custom_gene_sets")
         ),
         mainPanel(
             DT::dataTableOutput("DT_PasteGenes_DataFrame")
         )
     )
-
+    
 }
 
-server_upload = function(input, output, session, gene_table, tcga_data){
+server_upload = function(input, output, session, gene_table, tcga_data, custom_gene_sets){
     ### File Upload
     #Set Preview reactives
     PreviewSet_Filepath = reactiveVal(value = "", label = "PreviewSet_Filepath")
@@ -117,21 +126,60 @@ server_upload = function(input, output, session, gene_table, tcga_data){
         }
         
     })
-    
-    ### Show table
-    output$DT_PasteGenes_DataFrame = DT::renderDataTable({
+    display_table = reactiveVal()
+    observeEvent({
+        gene_table()
+    }, {
         df = gene_table()
         df = as.data.frame(df)
         valid_genes = rownames(tcga_data())
         # browser()
         if(nrow(df) > 0){
-           
             df = locate_genes_in_df(df, valid_genes)
             df = validate_genes_in_df(df, valid_genes)    
         }else{
             df = data.table(A = "please upload data")
         }
-        
-        DT::datatable(df)    
+        display_table(df)
     })
+    
+    ### Show table
+    output$DT_PasteGenes_DataFrame = DT::renderDataTable({
+        DT::datatable(display_table())    
+    })
+    
+    ### Report valid
+    
+    ### Add gene set
+    observeEvent({
+        input$btn_add_gene_set
+    }, {
+        current = custom_gene_sets()
+        df = display_table()
+        gl = subset(df, valid == TRUE)$gene_name
+        current[[input$txt_gene_set_name]] = gl
+        custom_gene_sets(current)
+    })
+    
+    # observeEvent({
+    #     custom_gene_sets()
+    # }, {
+    output$rpt_custom_gene_sets = renderUI({
+        gls =  custom_gene_sets()
+        hl = lapply(names(gls), function(nam){
+            x = gls[[nam]]
+            tags$tr(
+                tags$th(nam),
+                tags$th(length(x))
+            )
+        })
+        tags$table(
+            tags$tr(
+                tags$th("Name"),
+                tags$th("Length")
+            ),
+            hl
+        )
+    })
+    # })
 }

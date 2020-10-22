@@ -146,13 +146,54 @@ sampleCap = function(x, n = 500){
     out
 }
 
-#from seqtsne
-nn_clust = function(tsne_res, nsamp = Inf, nn = 100, auto_nn_fraction = 5, id_var = "submitter_id", x_var = "x", y_var = "y"){
-    # tsne_res[, tid := paste(tall_var, id)]
-    tsne_res[["tid"]] = tsne_res[[id_var]]
-    tsne_res[["tx"]] = tsne_res[[x_var]]
-    tsne_res[["ty"]] = tsne_res[[y_var]]
+km_clust = function(tsne_res, k = 5, id_var = "submitter_id", x_var = "x", y_var = "y", nsamp = Inf){
+    if(k < 2){
+        k = 2
+        warning("increasing nn to 2")
+    }
+    if(k > nrow(tsne_res)/2){
+        k = round(nrow(tsne_res)/2)
+        warning("decreasing k to ", k)
+    }
+    mat = t(as.matrix(tsne_res[, c(x_var, y_var), with = FALSE]))
+    colnames(mat) = tsne_res[[id_var]]
+    mat = mat[, sampleCap(seq(ncol(mat)), nsamp)]
     
+    km_res = kmeans(t(mat), centers = k)
+    tsne_res$cluster_id = paste("cluster", km_res$cluster[tsne_res[[id_var]]])
+    tsne_res
+}
+
+h_clust = function(tsne_res, n_clust = 5, id_var = "submitter_id", x_var = "x", y_var = "y", nsamp = Inf){
+    if(n_clust < 2){
+        n_clust = 2
+        warning("increasing n_clust to 2")
+    }
+    if(n_clust > nrow(tsne_res)/2){
+        n_clust = round(nrow(tsne_res)/2)
+        warning("decreasing n_clust to ", n_clust)
+    }
+    mat = t(as.matrix(tsne_res[, c(x_var, y_var), with = FALSE]))
+    colnames(mat) = tsne_res[[id_var]]
+    mat = mat[, sampleCap(seq(ncol(mat)), nsamp)]
+    
+    h_res = hclust(dist(t(mat)))
+    
+    
+    tsne_res$cluster_id = paste("cluster", cutree(h_res, n_clust)[tsne_res[[id_var]]])
+    tsne_res
+}
+
+#from seqtsne
+nn_clust = function(tsne_res, nn = 100, auto_nn_fraction = 5, id_var = "submitter_id", x_var = "x", y_var = "y", nsamp = Inf){
+    if(nn < 2){
+        nn = 2
+        warning("increasing nn to 2")
+    }
+    if(nn > nrow(tsne_res)/2){
+        nn = round(nrow(tsne_res)/2)
+        warning("decreasing nn to ", nn)
+    }
     if(auto_nn_fraction*nn > nrow(tsne_res)){
         warning("Automatically reducing nearest neighbors")
         nn = nrow(tsne_res)/auto_nn_fraction
@@ -160,15 +201,14 @@ nn_clust = function(tsne_res, nsamp = Inf, nn = 100, auto_nn_fraction = 5, id_va
             stop("not enough samples to cluster. ", nrow(tsne_res), " samples submitted.")
         }
     }
-    
-    mat = t(as.matrix(tsne_res[, .(tx, ty)]))
-    colnames(mat) = tsne_res$tid
+    mat = t(as.matrix(tsne_res[, c(x_var, y_var), with = FALSE]))
+    colnames(mat) = tsne_res[[id_var]]
     mat = mat[, sampleCap(seq(ncol(mat)), nsamp)]
     knn.info <- RANN::nn2(t(mat), k=nn)
     knn <- knn.info$nn.idx
-    colnames(knn) = c("tid", paste0("V", seq(nn-1)))
+    colnames(knn) = c(id_var, paste0("V", seq(nn-1)))
     knn = as.data.table(knn)
-    mknn = melt(knn, id.vars = "tid")
+    mknn = melt(knn, id.vars = id_var)
     
     # adj <- matrix(0, ncol(mat), ncol(mat))
     # rownames(adj) <- colnames(adj) <- colnames(mat)
@@ -176,7 +216,7 @@ nn_clust = function(tsne_res, nsamp = Inf, nn = 100, auto_nn_fraction = 5, id_va
     #     adj[i,colnames(mat)[knn[i,]]] <- 1
     # }
     ADJ = Matrix::Matrix(0, ncol(mat), ncol(mat))
-    ADJ[cbind(mknn$tid, mknn$value)] = 1
+    ADJ[cbind(mknn[[id_var]], mknn$value)] = 1
     rownames(ADJ) = colnames(mat)
     colnames(ADJ) = colnames(mat)
     g <- igraph::graph.adjacency(ADJ, mode="undirected")
@@ -187,22 +227,25 @@ nn_clust = function(tsne_res, nsamp = Inf, nn = 100, auto_nn_fraction = 5, id_va
     ## community membership
     com <- km$membership
     names(com) <- km$names
-    com_dt = data.table(tid = names(com), cluster_id = paste("cluster", com))
+    com_dt = data.table(V1 = names(com), cluster_id = paste("cluster", com))
+    setnames(com_dt, "V1", id_var)
     
-    p_dt = merge(tsne_res, com_dt, by = "tid")
+    p_dt = merge(tsne_res, com_dt, by = id_var)
+    
     # p_dt[, coms := paste("cluster", com)]
     # ggplot(p_dt, aes(x = tx, y = ty, color = coms)) +
     #     annotate("point", x  = p_dt$tx, y = p_dt$ty, size = .2) +
     #     geom_point(size = .5) +
     #     facet_wrap("coms")
     
-    setnames(p_dt, c("tx", "ty"), c(x_var, y_var))
-    p = ggplot(p_dt, aes_string(x = x_var, y = y_var, color = "cluster_id")) +
-        labs(color = "cluster_id") +
-        # annotate("point", x  = p_dt$tx, y = p_dt$ty, size = .2) +
-        geom_point(size = .5) #+
+    # p = ggplot(p_dt, aes_string(x = x_var, y = y_var, color = "cluster_id")) +
+    #     labs(color = "cluster_id") +
+    #     # annotate("point", x  = p_dt$tx, y = p_dt$ty, size = .2) +
+    #     geom_point(size = .5) #+
     # facet_wrap("coms")
-    return(list(data = p_dt, plot = p))
+    # return(list(data = p_dt, plot = p))
+    
+    p_dt
 }
 # ex_files = dir("example_data", full.names = TRUE)
 # # funs = lapply(ex_files, decide_parse_FUN)

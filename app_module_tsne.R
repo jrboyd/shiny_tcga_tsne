@@ -49,9 +49,9 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
                 
                 tsne_dt[, x := scales::rescale(x, c(-.5, .5))]
                 tsne_dt[, y := scales::rescale(y, c(-.5, .5))]
-                tsne_res(tsne_dt) 
+
                 
-                p_dt = nn_clust(tsne_dt, nsamp = Inf, nn = 100)$data
+                tsne_res(tsne_dt) 
                 
             }else{
                 showNotification("Need more valid genes/samples to run t-sne.", type = "error")
@@ -68,7 +68,6 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
         req(tsne_res())
         req(input$sel_facet_var)
         tsne_dt = tsne_res()
-        
         tsne_dt = merge(tsne_dt, meta_data(), by = "submitter_id")
         # browser()
         if(input$sel_color_by == "sample type"){ #c("sample type", "PAM50")

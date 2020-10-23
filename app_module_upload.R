@@ -6,9 +6,7 @@ ui_upload = function(){
     
     sidebarLayout(
         sidebarPanel(
-            tags$h3("TODO: gene set import/export"),
-            tags$h3("TODO: filtering after upload"),
-            tags$h3("TODO: hide example data"),
+
             fluidRow(
                 column(textInput("txt_gene_set_name", label = "Gene set name", value = "custom"), width = 9),
                 column(actionButton("btn_add_gene_set", label = "Add"), width = 3, style = "margin-top: 24px;",)
@@ -27,7 +25,10 @@ ui_upload = function(){
                 )
                 
             ),
-            uiOutput("rpt_custom_gene_sets")
+            uiOutput("rpt_custom_gene_sets"),
+            tags$h5("TODO: gene set import/export"),
+            tags$h5("TODO: filtering after upload"),
+            tags$h5("TODO: hide example data")
         ),
         mainPanel(
             DT::dataTableOutput("DT_PasteGenes_DataFrame")

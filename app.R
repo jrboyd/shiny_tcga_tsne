@@ -71,8 +71,8 @@ ui <- fluidPage(theme = "bootstrap.css",
                     tabPanel("DE",
                              sidebarLayout(
                                  sidebarPanel(
-                                     disabled(selectInput("sel_A_clust", label = "A group clusters", choices = "")),
-                                     disabled(selectInput("sel_B_clust", label = "B group clusters", choices = "")),
+                                     disabled(selectInput("sel_A_clust", label = "A group clusters", choices = "", multiple = TRUE)),
+                                     disabled(selectInput("sel_B_clust", label = "B group clusters", choices = "", multiple = TRUE)),
                                      tabsetPanel(id = "tabs_cluster_method",
                                                  tabPanel("knn", #id = "knn", 
                                                           numericInput("num_nn", label = "Nearest neighbors", value = 5, min = 2, max = Inf)
@@ -224,6 +224,19 @@ server <- function(input, output, session) {
         tsne_clust(tsne_dt.clust)
         
     })
+    
+    observeEvent(
+        tsne_clust(),
+        {
+            if(is.null(tsne_clust())){
+                disable("sel_A_clust")
+                disable("sel_B_clust")
+            }
+            cl = sort(unique(tsne_clust()$cluster_id))
+            
+            updateSelectInput(session, "sel_A_clust", choices = cl)
+            updateSelectInput(session, "sel_B_clust", choices = cl)
+        })
     
     server_tsne(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, code2type, FACET_VAR)
     server_expression_matrix(input, output, session,

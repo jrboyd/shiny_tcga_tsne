@@ -11,7 +11,9 @@ server_gene_xy = function(input, output, session, xy_df, color_df, rownames_to_v
             geom_point() + 
             coord_fixed() +
             labs(x = "", y = "", title = paste(rownames_to_vis(), "expression"), subtitle = "log10 scale") +
-            scale_color_viridis_c()
+            scale_color_viridis_c() +
+            theme(panel.background = element_blank(),
+                  panel.grid = element_blank())
         
     })
     

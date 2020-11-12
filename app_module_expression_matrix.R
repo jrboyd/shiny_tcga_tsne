@@ -20,7 +20,18 @@ server_expression_matrix = function(input, output, session,
         if(is.null(expression_loaded[[sel]])){
             expression_loaded[[sel]] = load_expression(expression_files[[sel]])
         }
-        tcga_data(expression_loaded[[sel]])
+        dat = expression_loaded[[sel]]
+        exp_dt = as.data.table(dat)
+        exp_dt$gene_name = rownames(dat)
+        exp_dt = melt(exp_dt, id.vars = "gene_name")
+        exp_dt = exp_dt[, .(value = max(value)), .(gene_name, variable)]
+        # exp_dt = unique(exp_mat$gene_name[duplicated(exp_mat$gene_name)])
+        exp_dt = dcast(exp_dt, gene_name~variable, value.var = "value")
+        exp_mat = as.matrix(exp_dt[, -1])
+        rownames(exp_mat) = exp_dt$gene_name
+        
+        stopifnot(!any(duplicated(rownames(exp_mat))))
+        tcga_data(exp_mat)
     })
     observe({
         showNotification(paste0("expression: ", nrow(tcga_data()), " rows x ", ncol(tcga_data()), " columns loaded."))

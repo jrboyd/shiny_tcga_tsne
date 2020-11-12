@@ -4,7 +4,7 @@ library(genefu)
 #expression files should have a first column of 
 #gene_names named gene_name and expression after that
 expression_files = list(
-  # BRCA = "data/BRCA_TCGA_expression.tiny.csv"
+    BRCA_tiny = "data/BRCA_TCGA_expression.tiny.csv",
     BRCA = "data/BRCA_TCGA_expression.csv"
 )
 

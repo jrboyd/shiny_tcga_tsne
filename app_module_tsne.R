@@ -83,7 +83,9 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
         p = p + 
             geom_point() + 
             coord_fixed() +
-            labs(x = "", y = "", title = "t-sne of TCGA samples", subtitle = paste(input$sel_gene_list, "gene list"))
+            labs(x = "", y = "", title = "t-sne of TCGA samples", subtitle = paste(input$sel_gene_list, "gene list")) +
+            theme(panel.background = element_blank(),
+                  panel.grid = element_blank())
         if(input$sel_facet_var == FACET_VAR$NONE){
             p
         }else if(input$sel_facet_var == FACET_VAR$SAMPLE_TYPE){

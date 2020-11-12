@@ -22,6 +22,8 @@ source("app_module_expression_matrix.R")
 source("app_module_upload.R")
 source("app_module_tsne.R")
 source("app_module_gene_xy_vis.R")
+source("app_module_point_selection.R")
+source("app_module_diff_expression.R")
 source("functions.R")
 # based on analyze_BRCA_tsne_allGenes_plusCells.R
 
@@ -32,10 +34,6 @@ clean_list = function(l){
     names(tmp) = NULL
     tmp
 }
-
-
-
-
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -48,7 +46,7 @@ ui <- fluidPage(
                  # Sidebar with a slider input for number of bins 
                  sidebarLayout(
                      sidebarPanel(
-                         selectInput("sel_data", label = "TCGA data", choices = c("BRCA")),
+                         selectInput("sel_data", label = "TCGA data", choices = names(expression_files)),
                          checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
                                             choices = c("normal", "tumor", "metastasis"), 
                                             selected = c("normal", "tumor", "metastasis")),
@@ -70,42 +68,18 @@ ui <- fluidPage(
                  ui_upload()
         ),
         tabPanel("DE",
-                 sidebarLayout(
-                     sidebarPanel(
-                         tags$h5("TODO: clean up some weird A/B interaction, B trumps A currently."),
-                         disabled(selectInput("sel_A_clust", label = "A group clusters", choices = "", multiple = TRUE)),
-                         disabled(selectInput("sel_B_clust", label = "B group clusters", choices = "", multiple = TRUE)),
-                         tabsetPanel(id = "tabs_cluster_method",
-                                     tabPanel("knn", #id = "knn", 
-                                              numericInput("num_nn", label = "Nearest neighbors", value = 5, min = 2, max = Inf)
-                                     ), 
-                                     tabPanel("kmeans", #id = "kmeans", 
-                                              numericInput("num_kmeans", label = "k", value = 5, min = 2, max = Inf)
-                                     ), 
-                                     tabPanel("hierarchical", #id = "hierarchical", 
-                                              numericInput("num_clust", label = "n_clust", value = 5, min = 2, max = Inf)
-                                     )
-                         ),
-                         withSpinner(plotOutput("plot_tsne_clusters", width = "600px", height = "600px"))
+                 ui_point_selection(),
+                 tabsetPanel(
+                     tabPanel("simple",
+                              plotOutput("plot_volcano")
                      ),
-                     mainPanel(
-                         withSpinner(plotOutput("plot_A_group", width = "600px", height = "600px",
-                                                brush = brushOpts(id = "plot_A_brush"))),
-                         tags$h3("Refine selection"),
-                         fluidRow(
-                             column(width = 4,
-                                    actionButton("btn_add_A", "Add A"),
-                                    actionButton("btn_rm_A", "Remove A"),
-                                    actionButton("btn_limit_A", "Limit A"),
-                             ), 
-                             column(width = 4,
-                                    actionButton("btn_add_B", "Add B"),
-                                    actionButton("btn_rm_B", "Remove B"),
-                                    actionButton("btn_limit_B", "Limit B")
-                             )
-                         )
+                     tabPanel("DESeq2",
+                              actionButton("btn_runDE", "Run DE"),
+                              withSpinner(DT::dataTableOutput("dt_DE_res"))
                      )
-                 ))
+                     
+                 )
+        )
     )
 )
 
@@ -209,226 +183,10 @@ server <- function(input, output, session) {
         showNotification(paste(length(gls), " custom gene sets"))
     })
     
-    output$plot_tsne_clusters = renderPlot({
-        req(tsne_clust())
-        tsne_dt = tsne_clust()
-        tsne_dt = merge(tsne_dt, meta_data(), by = "submitter_id")
-        
-        p = ggplot(tsne_dt, aes(x = x, y = y, color = cluster_id)) + 
-            geom_point() + 
-            coord_fixed() +
-            labs(x = "", y = "", title = "t-sne of TCGA samples", subtitle = paste(input$sel_gene_list, "gene list"))
-        p
-    })
-    
-    observe({
-        if(is.null(tsne_res())){
-            tsne_clust(NULL)
-        }
-        req(tsne_res())
-        tsne_dt = tsne_res()
-        clust_method = input$tabs_cluster_method
-        showNotification(paste("clustering method is", clust_method))
-        if(clust_method == "knn"){
-            tsne_dt.clust = nn_clust(tsne_dt, nn = input$num_nn)
-        }else if(clust_method == "kmeans"){
-            tsne_dt.clust = km_clust(tsne_dt, k = input$num_kmeans)
-        }else if(clust_method == "hierarchical"){
-            tsne_dt.clust = h_clust(tsne_dt, n_clust = input$num_clust)
-        }else{
-            stop("Unrecognized clustering method, ", clust_method)
-        }
-        tsne_dt.clust$group = "bg"
-        tsne_clust(tsne_dt.clust)
-        # updateSelectInput(session, "sel_A_clust", choices = cl, selected = cl[1])
-        # updateSelectInput(session, "sel_B_clust", choices = cl, selected = cl[2])
-    })
-    
-    observeEvent({
-        tsne_clust()
-    },
-    {
-        if(is.null(tsne_clust())){
-            disable("sel_A_clust")
-            disable("sel_B_clust")
-        }
-        cl = sort(unique(tsne_clust()$cluster_id))
-        cl = cl[order(as.numeric(sub("[a-zA-Z ]+", "", cl)))]
-        enable("sel_A_clust")
-        enable("sel_B_clust")
-        updateSelectInput(session, "sel_A_clust", choices = cl, selected = cl[1])
-        updateSelectInput(session, "sel_B_clust", choices = cl, selected = cl[2])
-        prev_A_clust = cl[1]
-        prev_B_clust = cl[2]
-        sel_A_ids(tsne_clust()[cluster_id %in% cl[1]]$bcr_patient_barcode)
-        sel_B_ids(tsne_clust()[cluster_id %in% cl[2]]$bcr_patient_barcode)
-        
-    })
     
     
-    sel_A_ids = reactiveVal(character())
-    sel_B_ids = reactiveVal(character())
-    prev_A_clust = character()
-    prev_B_clust = character()
     
-    update_ids = function(current_clust, previous_clust, current_ids){
-        added_clust = setdiff(current_clust, previous_clust)
-        removed_clust = setdiff(previous_clust, current_clust)
-        if(length(added_clust) > 0 & length(removed_clust) > 0){
-            stop("inconceivable! new and missing longer than 0.")
-        }
-        tsne_dt = tsne_clust()
-        new_ids = current_ids
-        if(length(added_clust) > 0){
-            new_ids = union(
-                current_ids,
-                tsne_dt[cluster_id %in% added_clust]$bcr_patient_barcode          
-            )
-        }
-        if(length(removed_clust) > 0){
-            new_ids = setdiff(
-                current_ids,
-                tsne_dt[cluster_id %in% removed_clust]$bcr_patient_barcode          
-            )
-        }
-        new_ids
-    }
-    
-    observeEvent({
-        input$sel_A_clust
-    }, {
-        new_ids = update_ids(input$sel_A_clust, 
-                             prev_A_clust,
-                             isolate(sel_A_ids()))
-        prev_A_clust = input$sel_A_clust
-        sel_A_ids(new_ids)
-    })
-    
-    observeEvent({
-        input$sel_B_clust
-    }, {
-        new_ids = update_ids(input$sel_B_clust, 
-                             prev_B_clust,
-                             isolate(sel_B_ids()))
-        prev_B_clust = input$sel_B_clust
-        sel_B_ids(new_ids)
-    })
-    
-    output$plot_A_group = renderPlot({
-        tsne_dt = tsne_clust()
-        # tsne_dt[, sel := cluster_id %in% input$sel_A_clust]
-        # ggplot(tsne_dt, aes(x = x, y = y)) +
-        #     geom_point(data= tsne_dt[sel == FALSE], color = 'gray', size = .3) +
-        #     geom_point(data= tsne_dt[sel == TRUE], color = 'blue', size = .8) 
-        tsne_dt$group = "bg"
-        # tsne_dt[cluster_id %in% input$sel_A_clust, group := "A"]
-        # tsne_dt[cluster_id %in% input$sel_B_clust, group := "B"]
-        
-        tsne_dt[bcr_patient_barcode %in% sel_A_ids(), group := "A"]
-        tsne_dt[bcr_patient_barcode %in% sel_B_ids(), group := "B"]
-        
-        ggplot(tsne_dt, aes(x = x, y = y)) +
-            geom_point(data= tsne_dt[group == "bg"], color = 'gray', size = .3) +
-            geom_point(data= tsne_dt[group != "bg"], aes(color = group), size = .8) +
-            scale_color_manual(values = c("A" = "red", "B" = "blue")) +
-            theme(panel.background = element_blank(),
-                  panel.grid = element_blank())
-        
-    })
-    
-    # actionButton("btn_add_A", "Add A"),
-    # actionButton("btn_rm_A", "Remove A"),
-    # actionButton("btn_limit_A", "Limit A"),
-    # actionButton("btn_add_B", "Add B"),
-    # actionButton("btn_rm_B", "Remove B"),
-    # actionButton("btn_limit_B", "Limit B")
-    #plot A buttons
-    observeEvent({
-        input$btn_add_A
-    }, {
-        brsh = input$plot_A_brush
-        tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$bcr_patient_barcode
-        
-        sel_A_ids(
-            union(isolate(sel_A_ids()), 
-                  ids_in_rng)    
-        )
-    })
-    
-    observeEvent({
-        input$btn_rm_A
-    }, {
-        brsh = input$plot_A_brush
-        tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$bcr_patient_barcode
-        
-        sel_A_ids(
-            setdiff(isolate(sel_A_ids()), 
-                  ids_in_rng)    
-        )
-    })
-    
-    observeEvent({
-        input$btn_limit_A
-    }, {
-        brsh = input$plot_A_brush
-        tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$bcr_patient_barcode
-        
-        sel_A_ids(
-            intersect(isolate(sel_A_ids()), 
-                  ids_in_rng)    
-        )
-    })
-    
-    observeEvent({
-        input$btn_add_B
-    }, {
-        brsh = input$plot_A_brush
-        tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$bcr_patient_barcode
-        
-        sel_B_ids(
-            union(isolate(sel_B_ids()), 
-                  ids_in_rng)    
-        )
-    })
-    
-    observeEvent({
-        input$btn_rm_B
-    }, {
-        brsh = input$plot_A_brush
-        tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$bcr_patient_barcode
-        
-        sel_B_ids(
-            setdiff(isolate(sel_B_ids()), 
-                    ids_in_rng)    
-        )
-    })
-    
-    observeEvent({
-        input$btn_limit_B
-    }, {
-        brsh = input$plot_A_brush
-        tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$bcr_patient_barcode
-        sel_B_ids(
-            intersect(isolate(sel_B_ids()), 
-                      ids_in_rng)    
-        )
-    })
-    
-    output$plot_B_group = renderPlot({
-        tsne_dt = tsne_clust()
-        tsne_dt[, sel := cluster_id %in% input$sel_B_clust]
-        ggplot(tsne_dt, aes(x = x, y = y)) +
-            geom_point(data= tsne_dt[sel == FALSE], color = 'gray', size = .3) +
-            geom_point(data= tsne_dt[sel == TRUE], color = 'blue', size = .8) 
-    })
-    
-    server_tsne(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, code2type, FACET_VAR)
+    #running tsne
     server_expression_matrix(input, output, session,
                              expression_files,
                              expression_loaded,
@@ -438,10 +196,50 @@ server <- function(input, output, session) {
                              code2type,
                              tsne_input,
                              tsne_res)
+    
+    server_tsne(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, code2type, FACET_VAR)
+    
+    #the gene expression mapped to tsne space
     server_gene_xy(input, output, session, tsne_res, tcga_data, vis_gene)
+    #upload user data for gene lists
     server_upload(input, output, session, gene_table, tcga_data, custom_gene_sets)
+    #interface to select A and B set of points from scatterplot
+    sample_groups = server_point_selection(input, output, session, tsne_clust = tsne_clust, meta_data = meta_data, tsne_res = tsne_res)
     
+    DE_res = reactiveVal()
     
+    observeEvent({
+        sample_groups()
+    },{
+        req(sample_groups())
+        showNotification(paste0("A ", length(sample_groups()$A), "\n",
+                                "B ", length(sample_groups()$B)))
+    })
+    
+    observeEvent({
+        input$btn_runDE
+    }, {
+        req(tsne_input())
+        req(sample_groups())
+        diff_res = run_DE(tsne_input(), sample_groups()$A(), sample_groups()$B())
+        DE_res(diff_res)
+    })
+    
+    observeEvent({
+        DE_res()
+    }, {
+        req(DE_res())
+        showNotification(paste("diff gene count:", nrow(DE_res())))
+    })
+    
+    output$dt_DE_res = DT::renderDataTable({
+        if(is.null(DE_res())){
+            DT::datatable(data.frame(waiting = "", for_ = "", data = ""))    
+        }else{
+            DT::datatable(DE_res())    
+        }
+        
+    })
 }
 
 # Run the application 

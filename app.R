@@ -35,6 +35,41 @@ clean_list = function(l){
     tmp
 }
 
+reinit_data = function(sel){
+    sel = input$sel_data
+    #meta data
+    if(!sel %in% names(clinical_loaded)){
+        stop(sel, " not found in loaded metadata.")
+    }
+    # if(is.null(clinical_loaded[[sel]])){
+    #     clinical_loaded[[sel]] = load_metadata(clinical_files[[sel]])
+    # }
+    meta_data(clinical_loaded[[sel]])
+    
+    #expression data
+    if(!sel %in% names(expression_files)){
+        stop(sel, " not found in expression_files.")
+    }
+    if(is.null(expression_loaded[[sel]])){
+        expression_loaded[[sel]] = load_expression(expression_files[[sel]])
+    }
+    dat = expression_loaded[[sel]]
+    exp_dt = as.data.table(dat)
+    exp_dt$gene_name = rownames(dat)
+    exp_dt = melt(exp_dt, id.vars = "gene_name")
+    exp_dt = exp_dt[, .(value = max(value)), .(gene_name, variable)]
+    # exp_dt = unique(exp_mat$gene_name[duplicated(exp_mat$gene_name)])
+    exp_dt = dcast(exp_dt, gene_name~variable, value.var = "value")
+    exp_mat = as.matrix(exp_dt[, -1])
+    rownames(exp_mat) = exp_dt$gene_name
+    
+    stopifnot(!any(duplicated(rownames(exp_mat))))
+    tcga_data(exp_mat)
+    
+    #reset downstream
+    
+}
+
 # Define UI for application that draws a histogram
 ui <- fluidPage(
     theme = "bootstrap.css",
@@ -71,7 +106,9 @@ ui <- fluidPage(
                  ui_point_selection(),
                  tabsetPanel(
                      tabPanel("simple",
-                              plotOutput("plot_volcano")
+                              withSpinner(plotOutput("plot_volcano", width = "400px", height = "400px")),
+                              withSpinner(plotOutput("plot_boxes", width = "400px", height = "400px"))
+                              
                      ),
                      tabPanel("DESeq2",
                               actionButton("btn_runDE", "Run DE"),
@@ -239,6 +276,64 @@ server <- function(input, output, session) {
             DT::datatable(DE_res())    
         }
         
+    })
+    
+    DE_fast_raw = reactiveVal()
+    DE_fast_res = reactiveVal()
+    
+    observeEvent({
+        tsne_input()
+        sample_groups()
+        sample_groups()$A()
+        sample_groups()$B()
+    }, {
+        req(tsne_input())
+        req(sample_groups())
+        if(length(sample_groups()$A()) == 0 | length(sample_groups()$B()) == 0){
+            DE_fast_raw(NULL)
+            DE_fast_res(NULL)
+        }else{
+            dt = run_group.fast(tsne_input(), sample_groups()$A(), sample_groups()$B())
+            DE_fast_raw(dt)
+            p_dt = run_DE.fast(dt)   
+            DE_fast_res(p_dt)    
+        }
+        
+    })
+    
+    output$plot_boxes = renderPlot({
+        req( DE_fast_raw())
+        req(DE_fast_res())
+        
+        dt = DE_fast_raw()
+        p_dt = DE_fast_res()
+        
+        p_dt
+        high_dt = p_dt[lg2_min > 10][order(-abs(lg2_fc))][1:10][order(lg2_fc)]
+        high_genes = as.character(high_dt$gene_name)
+        
+        sel_dt = dt[gene_name %in% high_genes]
+        sel_dt$gene_name = factor(sel_dt$gene_name, levels = high_genes)
+        # browser()
+        ggplot(sel_dt, aes(x = gene_name, y = log2(expression+1), color = group)) +
+            geom_boxplot(position = "dodge", width = .6) +
+            labs(y = "log2 expression", x= "") +
+            scale_color_manual(values = c("A" = "red", "B" = "blue", "." = "gray"), drop = FALSE) +
+            theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+    })
+    
+    output$plot_volcano = renderPlot({
+        req(DE_fast_res())
+        p_dt = DE_fast_res()
+        
+        p_dt
+        high_dt = p_dt[lg2_min > 10][order(-abs(lg2_fc))][1:10]
+        
+        ggplot(p_dt, aes(x = lg2_fc, y = lg2_min)) +
+            geom_point(alpha = .1) +
+            geom_point(data= high_dt) +
+            ggrepel::geom_text_repel(data = high_dt, aes(label = gene_name)) +
+            labs(x = "log2 fold-change(B / A)", y = "log2 min(A, B)")
     })
 }
 

@@ -232,7 +232,13 @@ server <- function(input, output, session) {
                              meta_data,
                              code2type,
                              tsne_input,
-                             tsne_res)
+                             tsne_res, 
+                             dataset_downstream = list(sample_groups_A, 
+                                                       sample_groups_B, 
+                                                       DE_res, 
+                                                       DE_fast_raw, 
+                                                       DE_fast_res,
+                                                       DE_res))
     
     server_tsne(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, code2type, FACET_VAR)
     
@@ -242,23 +248,26 @@ server <- function(input, output, session) {
     server_upload(input, output, session, gene_table, tcga_data, custom_gene_sets)
     #interface to select A and B set of points from scatterplot
     sample_groups = server_point_selection(input, output, session, tsne_clust = tsne_clust, meta_data = meta_data, tsne_res = tsne_res)
+    sample_groups_A =sample_groups$A
+    sample_groups_B =sample_groups$B
     
+    #DESeq2
     DE_res = reactiveVal()
     
     observeEvent({
-        sample_groups()
+        sample_groups
     },{
-        req(sample_groups())
-        showNotification(paste0("A ", length(sample_groups()$A), "\n",
-                                "B ", length(sample_groups()$B)))
+        req(sample_groups)
+        showNotification(paste0("A ", length(sample_groups_A()), "\n",
+                                "B ", length(sample_groups_B())))
     })
     
     observeEvent({
         input$btn_runDE
     }, {
         req(tsne_input())
-        req(sample_groups())
-        diff_res = run_DE(tsne_input(), sample_groups()$A(), sample_groups()$B())
+        req(sample_groups)
+        diff_res = run_DE(tsne_input(), sample_groups_A(), sample_groups_B())
         DE_res(diff_res)
     })
     
@@ -278,22 +287,23 @@ server <- function(input, output, session) {
         
     })
     
+    #DEfast
     DE_fast_raw = reactiveVal()
     DE_fast_res = reactiveVal()
     
     observeEvent({
         tsne_input()
-        sample_groups()
-        sample_groups()$A()
-        sample_groups()$B()
+        sample_groups
+        sample_groups_A()
+        sample_groups_B()
     }, {
         req(tsne_input())
-        req(sample_groups())
-        if(length(sample_groups()$A()) == 0 | length(sample_groups()$B()) == 0){
+        req(sample_groups)
+        if(length(sample_groups_A()) == 0 | length(sample_groups_B()) == 0){
             DE_fast_raw(NULL)
             DE_fast_res(NULL)
         }else{
-            dt = run_group.fast(tsne_input(), sample_groups()$A(), sample_groups()$B())
+            dt = run_group.fast(tsne_input(), sample_groups_A(), sample_groups_B())
             DE_fast_raw(dt)
             p_dt = run_DE.fast(dt)   
             DE_fast_res(p_dt)    

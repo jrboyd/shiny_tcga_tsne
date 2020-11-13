@@ -248,15 +248,19 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
         )
     })
     
-    id_groups = reactiveVal()
+    # id_groups = reactiveValues(A = list(), B = list())
+    
+    A = reactiveVal()
+    B = reactiveVal()
     
     observeEvent({
         sel_A_ids()
         sel_B_ids()
     }, {
-        id_groups(list(A = sel_A_ids, B = sel_B_ids))
+        A(sel_A_ids)
+        B(sel_B_ids)
     })
     
-    id_groups
+    list(A = A, B = B)
     
 }

@@ -7,9 +7,10 @@ server_expression_matrix = function(input, output, session,
                                     meta_data,
                                     code2type,
                                     tsne_input,
-                                    tsne_res){
+                                    tsne_res,
+                                    dataset_downstream = list()){
     
-    
+    #handle change in dataset selection
     observeEvent({
         input$sel_data
     }, {
@@ -17,6 +18,7 @@ server_expression_matrix = function(input, output, session,
         if(!sel %in% names(expression_files)){
             stop(sel, " not found in expression_files.")
         }
+        #expression data
         if(is.null(expression_loaded[[sel]])){
             expression_loaded[[sel]] = load_expression(expression_files[[sel]])
         }
@@ -29,10 +31,23 @@ server_expression_matrix = function(input, output, session,
         exp_dt = dcast(exp_dt, gene_name~variable, value.var = "value")
         exp_mat = as.matrix(exp_dt[, -1])
         rownames(exp_mat) = exp_dt$gene_name
-        
+
         stopifnot(!any(duplicated(rownames(exp_mat))))
         tcga_data(exp_mat)
+        
+        #meta data
+        if(!sel %in% names(clinical_loaded)){
+            stop(sel, " not found in loaded metadata.")
+        }
+        meta_data(clinical_loaded[[sel]])
+        
+        #reset downstream
+        browser()
+        for(rv in dataset_downstream){
+            rv(NULL)
+        }
     })
+    
     observe({
         showNotification(paste0("expression: ", nrow(tcga_data()), " rows x ", ncol(tcga_data()), " columns loaded."))
     })
@@ -54,20 +69,22 @@ server_expression_matrix = function(input, output, session,
     
     
     ### patient metadata
-    observeEvent({
-        input$sel_data
-    }, {
-        sel = input$sel_data
-        if(!sel %in% names(clinical_loaded)){
-            stop(sel, " not found in loaded metadata.")
-        }
-        # if(is.null(clinical_loaded[[sel]])){
-        #     clinical_loaded[[sel]] = load_metadata(clinical_files[[sel]])
-        # }
-        meta_data(clinical_loaded[[sel]])
-    })
-    observe({
-        showNotification(paste0("metadata: ", nrow(meta_data()), " rows x ", ncol(meta_data()), " columns loaded."))
-    })
+#     observeEvent({
+#         input$sel_data
+#     }, {
+#         sel = input$sel_data
+#         if(!sel %in% names(clinical_loaded)){
+#             stop(sel, " not found in loaded metadata.")
+#         }
+#         # if(is.null(clinical_loaded[[sel]])){
+#         #     clinical_loaded[[sel]] = load_metadata(clinical_files[[sel]])
+#         # }
+#         meta_data(clinical_loaded[[sel]])
+#     })
+#     observe({
+#         showNotification(paste0("metadata: ", nrow(meta_data()), " rows x ", ncol(meta_data()), " columns loaded."))
+#     })
+#     
+# }
     
 }

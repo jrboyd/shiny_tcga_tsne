@@ -4,7 +4,7 @@ library(ggplot2)
 NCORES = 10
 
 run_group.fast = function(exp_mat, a, b, min_fraction = .5){
-    browser()
+    # browser()
     dt = as.data.table(reshape2::melt(exp_mat[, c(a, b)]))
     setnames(dt, c("Var1", "Var2", "value"), c("gene_name", "id", "expression"))
     dt[, group := ifelse(id %in% a, "A", "B")]

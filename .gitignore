@@ -5,3 +5,6 @@
 MCF10A_H3K27AC_pooled_model.pdf
 data
 *.pdf
+diff_res.sig.csv
+diff_res.Rds
+diff_data.Rds

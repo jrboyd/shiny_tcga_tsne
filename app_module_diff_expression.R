@@ -5,6 +5,12 @@ NCORES = 10
 
 run_group.fast = function(exp_mat, a, b, min_fraction = .5){
     # browser()
+    if("reactiveVal" %in% class(a)){
+        a = a()
+    }
+    if("reactiveVal" %in% class(b)){
+        b = b()
+    }
     dt = as.data.table(reshape2::melt(exp_mat[, c(a, b)]))
     setnames(dt, c("Var1", "Var2", "value"), c("gene_name", "id", "expression"))
     dt[, group := ifelse(id %in% a, "A", "B")]
@@ -35,7 +41,14 @@ run_DE.fast = function(dt){
 }
 
 run_DE = function(exp_mat, a, b, min_fraction = .5){
-    sample_info = data.table(id = c(a, b), group = factor(c(rep("A", length(A)), rep("B", length(b)))))
+    if("reactiveVal" %in% class(a)){
+        a = a()
+    }
+    if("reactiveVal" %in% class(b)){
+        b = b()
+    }
+    # saveRDS(list(exp_mat = exp_mat, a = a, b = b, min_fraction = min_fraction ), "diff_data.Rds")
+    sample_info = data.table(id = c(a, b), group = factor(c(rep("A", length(a)), rep("B", length(b)))))
     
     
     register(MulticoreParam(NCORES))
@@ -47,7 +60,8 @@ run_DE = function(exp_mat, a, b, min_fraction = .5){
     rf_b = apply(input_mat[,b], 1, function(x)sum(x>0)/length(x))
     k = rf_a> min_fraction | rf_b > min_fraction
     input_mat = input_mat[k,]
-    dds <- DESeqDataSetFromMatrix(countData = input_mat,
+    rm = apply(input_mat, 1, max)
+    dds <- DESeqDataSetFromMatrix(countData = input_mat[rm<5e7,],
                                   colData = sample_info,
                                   design = ~ group)
     dds = DESeq(dds)#, parallel = TRUE)

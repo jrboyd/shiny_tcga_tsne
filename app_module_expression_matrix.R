@@ -42,7 +42,7 @@ server_expression_matrix = function(input, output, session,
         meta_data(clinical_loaded[[sel]])
         
         #reset downstream
-        browser()
+        # browser()
         for(rv in dataset_downstream){
             rv(NULL)
         }

@@ -106,6 +106,7 @@ ui <- fluidPage(
                  ui_point_selection(),
                  tabsetPanel(
                      tabPanel("simple",
+                              actionButton("btn_runDEfast", "Run DE"),
                               withSpinner(plotOutput("plot_volcano", width = "400px", height = "400px")),
                               withSpinner(plotOutput("plot_boxes", width = "400px", height = "400px"))
                               
@@ -292,10 +293,11 @@ server <- function(input, output, session) {
     DE_fast_res = reactiveVal()
     
     observeEvent({
-        tsne_input()
-        sample_groups
-        sample_groups_A()
-        sample_groups_B()
+        input$btn_runDEfast
+        # tsne_input()
+        # sample_groups
+        # sample_groups_A()
+        # sample_groups_B()
     }, {
         req(tsne_input())
         req(sample_groups)
@@ -324,7 +326,6 @@ server <- function(input, output, session) {
         
         sel_dt = dt[gene_name %in% high_genes]
         sel_dt$gene_name = factor(sel_dt$gene_name, levels = high_genes)
-        # browser()
         ggplot(sel_dt, aes(x = gene_name, y = log2(expression+1), color = group)) +
             geom_boxplot(position = "dodge", width = .6) +
             labs(y = "log2 expression", x= "") +

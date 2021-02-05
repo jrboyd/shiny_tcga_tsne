@@ -111,6 +111,7 @@ locate_genes_in_df = function(df, valid_genes){
     if(!is.null(gene_col)){
         setnames(df, gene_col, "gene_name")
     }else{
+        if(valid_genes[1] == "PASTE")
         warning("could not locate valid genes in provided data.")
     }
     df
@@ -146,7 +147,7 @@ sampleCap = function(x, n = 500){
     out
 }
 
-km_clust = function(tsne_res, k = 5, id_var = "submitter_id", x_var = "x", y_var = "y", nsamp = Inf){
+km_clust = function(tsne_res, k = 5, id_var = "patient_id", x_var = "x", y_var = "y", nsamp = Inf){
     if(k < 2){
         k = 2
         warning("increasing nn to 2")
@@ -164,7 +165,7 @@ km_clust = function(tsne_res, k = 5, id_var = "submitter_id", x_var = "x", y_var
     tsne_res
 }
 
-h_clust = function(tsne_res, n_clust = 5, id_var = "submitter_id", x_var = "x", y_var = "y", nsamp = Inf){
+h_clust = function(tsne_res, n_clust = 5, id_var = "patient_id", x_var = "x", y_var = "y", nsamp = Inf){
     if(n_clust < 2){
         n_clust = 2
         warning("increasing n_clust to 2")
@@ -185,7 +186,7 @@ h_clust = function(tsne_res, n_clust = 5, id_var = "submitter_id", x_var = "x", 
 }
 
 #from seqtsne
-nn_clust = function(tsne_res, nn = 100, auto_nn_fraction = 5, id_var = "submitter_id", x_var = "x", y_var = "y", nsamp = Inf){
+nn_clust = function(tsne_res, nn = 100, auto_nn_fraction = 5, id_var = "patient_id", x_var = "x", y_var = "y", nsamp = Inf){
     if(nn < 2){
         nn = 2
         warning("increasing nn to 2")

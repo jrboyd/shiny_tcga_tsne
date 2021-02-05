@@ -16,8 +16,7 @@ library(shinyjs)
 library(shinycssloaders)
 
 source("setup_gene_lists.R")
-source("setup_clinical.R")
-source("setup_tcga_expression.R")
+source("setup_datasets.R")
 source("app_module_expression_matrix.R")
 source("app_module_upload.R")
 source("app_module_tsne.R")
@@ -27,7 +26,12 @@ source("app_module_diff_expression.R")
 source("functions.R")
 # based on analyze_BRCA_tsne_allGenes_plusCells.R
 
-code2type = c("01" = "tumor", "06" = "metastasis", "11" = "normal")
+
+
+# code2type = c("01" = "tumor", "06" = "metastasis", "11" = "normal")
+code2type = code_dt$long_name
+names(code2type) = code_dt$code
+
 FACET_VAR = list(NONE = "none", SAMPLE_TYPE = "sample type", PAM50 = "PAM50")
 clean_list = function(l){
     tmp = unlist(l)
@@ -36,18 +40,19 @@ clean_list = function(l){
 }
 
 reinit_data = function(sel){
+    browser()
     sel = input$sel_data
     #meta data
     if(!sel %in% names(clinical_loaded)){
         stop(sel, " not found in loaded metadata.")
     }
-    # if(is.null(clinical_loaded[[sel]])){
-    #     clinical_loaded[[sel]] = load_metadata(clinical_files[[sel]])
-    # }
+    if(is.null(clinical_loaded[[sel]])){
+        clinical_loaded[[sel]] = fread(clinical_files[[sel]])
+    }
     meta_data(clinical_loaded[[sel]])
     
     #expression data
-    if(!sel %in% names(expression_files)){
+    if(!sel %in% dataset_names){
         stop(sel, " not found in expression_files.")
     }
     if(is.null(expression_loaded[[sel]])){
@@ -81,10 +86,10 @@ ui <- fluidPage(
                  # Sidebar with a slider input for number of bins 
                  sidebarLayout(
                      sidebarPanel(
-                         selectInput("sel_data", label = "TCGA data", choices = names(expression_files)),
+                         selectInput("sel_data", label = "TCGA data", choices = dataset_names),
                          checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
-                                            choices = c("normal", "tumor", "metastasis"), 
-                                            selected = c("normal", "tumor", "metastasis")),
+                                            choices = code2type, 
+                                            selected = code2type),
                          radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)), #c("none", "sample type", "PAM50")),
                          radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE, selected = "PAM50"),
                          disabled((selectInput("sel_custom_gene_set", label = "Custom gene lists", choices = ""))),
@@ -138,6 +143,9 @@ server <- function(input, output, session) {
     
     #metadata for patient entries
     meta_data = reactiveVal()
+    #metadata for sample entries
+    sample_data = reactiveVal()
+    
     #result of tsne
     tsne_res = reactiveVal()
     #tsne_res with clustering applied
@@ -226,11 +234,12 @@ server <- function(input, output, session) {
     
     #running tsne
     server_expression_matrix(input, output, session,
-                             expression_files,
                              expression_loaded,
                              tcga_data,
                              clinical_loaded,
                              meta_data,
+                             sample_loaded,
+                             sample_data,
                              code2type,
                              tsne_input,
                              tsne_res, 
@@ -241,7 +250,7 @@ server <- function(input, output, session) {
                                                        DE_fast_res,
                                                        DE_res))
     
-    server_tsne(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, code2type, FACET_VAR)
+    server_tsne(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, sample_data, code2type, FACET_VAR)
     
     #the gene expression mapped to tsne space
     server_gene_xy(input, output, session, tsne_res, tcga_data, vis_gene)

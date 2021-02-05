@@ -46,7 +46,7 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
     output$plot_tsne_clusters = renderPlot({
         req(tsne_clust())
         tsne_dt = tsne_clust()
-        tsne_dt = merge(tsne_dt, meta_data(), by = "submitter_id")
+        tsne_dt = merge(tsne_dt, meta_data(), by = "patient_id")
         
         p = ggplot(tsne_dt, aes(x = x, y = y, color = cluster_id)) + 
             geom_point() + 

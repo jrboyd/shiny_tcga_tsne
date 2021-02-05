@@ -16,11 +16,11 @@ run_tsne = function(expression_matrix, perplexity = 30){
     
     tsne_df = as.data.table(tsne_patient$Y)
     colnames(tsne_df) = c("x", "y")
-    tsne_df$bcr_patient_barcode = colnames(expression_matrix)
+    tsne_df$sample_id = colnames(expression_matrix)
     tsne_df
 }
  
-server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, code2type, FACET_VAR){
+server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, sample_data, code2type, FACET_VAR){
     ### Running t-sne
     
     observeEvent({
@@ -39,18 +39,10 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
                 FALSE
             })
             if(tsne_worked){
-                regx = regexpr("^.{4}-.{2}-.{4}", tsne_dt$bcr_patient_barcode)
-                tsne_dt$submitter_id = regmatches(tsne_dt$bcr_patient_barcode, regx)
-                tsne_dt[, sample_code := tstrsplit(bcr_patient_barcode, "-", keep = 4)]
-                tsne_dt[, sample_code := sub("[A-Z]", "", sample_code)]
-                tsne_dt[, sample_type := code2type[sample_code]]
-                # tsne_dt$sample_code %>% table
-                # tsne_dt$sample_type %>% table
-                
+                samp_dt = sample_data()
+                tsne_dt = merge(tsne_dt, samp_dt, by = "sample_id")
                 tsne_dt[, x := scales::rescale(x, c(-.5, .5))]
                 tsne_dt[, y := scales::rescale(y, c(-.5, .5))]
-
-                
                 tsne_res(tsne_dt) 
                 
             }else{
@@ -68,7 +60,7 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
         req(tsne_res())
         req(input$sel_facet_var)
         tsne_dt = tsne_res()
-        tsne_dt = merge(tsne_dt, meta_data(), by = "submitter_id")
+        tsne_dt = merge(tsne_dt, meta_data(), by = "patient_id")
         # browser()
         if(input$sel_color_by == "sample type"){ #c("sample type", "PAM50")
             p = ggplot(tsne_dt, aes(x = x, y = y, color = sample_type)) 

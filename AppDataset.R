@@ -67,8 +67,24 @@ LoadAppDataset = function(object){
     object
 }
 
-object = CreateAppDataset.installed("installed_datasets/BRCA_tiny")
+UnloadAppDataset = function(object){
+    object@expression_data = matrix()
+    object@sample_data = data.frame()
+    object@clinical_data = data.frame()
+    object@info_data = data.frame()
+    object@is_loaded = FALSE
+    object
+}
+
+
+object = CreateAppDataset.installed("installed_datasets/TARGET")
+object = CreateAppDataset.installed("installed_datasets/BRCA_tiny/")
+object
 object = LoadAppDataset(object)
+object
+
+object = UnloadAppDataset(object)
+object
 
 ExpressionMatrix = function(object){
     object@expression_data    
@@ -83,3 +99,6 @@ DatasetName = function(object){
     object@name
 }
 
+isLoaded = function(object){
+    object@is_loaded
+}

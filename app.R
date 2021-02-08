@@ -39,42 +39,6 @@ clean_list = function(l){
     tmp
 }
 
-reinit_data = function(sel){
-    browser()
-    sel = input$sel_data
-    #meta data
-    if(!sel %in% names(clinical_loaded)){
-        stop(sel, " not found in loaded metadata.")
-    }
-    if(is.null(clinical_loaded[[sel]])){
-        clinical_loaded[[sel]] = fread(clinical_files[[sel]])
-    }
-    meta_data(clinical_loaded[[sel]])
-    
-    #expression data
-    if(!sel %in% dataset_names){
-        stop(sel, " not found in expression_files.")
-    }
-    if(is.null(expression_loaded[[sel]])){
-        expression_loaded[[sel]] = load_expression(expression_files[[sel]])
-    }
-    dat = expression_loaded[[sel]]
-    exp_dt = as.data.table(dat)
-    exp_dt$gene_name = rownames(dat)
-    exp_dt = melt(exp_dt, id.vars = "gene_name")
-    exp_dt = exp_dt[, .(value = max(value)), .(gene_name, variable)]
-    # exp_dt = unique(exp_mat$gene_name[duplicated(exp_mat$gene_name)])
-    exp_dt = dcast(exp_dt, gene_name~variable, value.var = "value")
-    exp_mat = as.matrix(exp_dt[, -1])
-    rownames(exp_mat) = exp_dt$gene_name
-    
-    stopifnot(!any(duplicated(rownames(exp_mat))))
-    tcga_data(exp_mat)
-    
-    #reset downstream
-    
-}
-
 # Define UI for application that draws a histogram
 ui <- fluidPage(
     theme = "bootstrap.css",
@@ -143,11 +107,23 @@ server <- function(input, output, session) {
     meta_data = reactiveVal()
     #metadata for sample entries
     sample_data = reactiveVal()
+    active_dataset = reactiveVal()
     
     #result of tsne
     tsne_res = reactiveVal()
     #tsne_res with clustering applied
     tsne_clust = reactiveVal()
+    
+    dataset_downstream = list(
+        # sample_groups_A, 
+        # sample_groups_B, 
+        # DE_res, 
+        # DE_fast_raw, 
+        # DE_fast_res,
+        # DE_res
+    )
+    
+    
     ## watch gene inputs
     observeEvent({
         input$sel_gene_list
@@ -165,18 +141,15 @@ server <- function(input, output, session) {
         input_genes(gl)
     })
     
-    # uiOutput("dynamic_sel_sample_type_filter"),
-    # checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
-    #                    choices = code2type, 
-    #                    selected = code2type),
-    
     output$dynamic_sel_sample_type_filter =  renderUI({
         req(sample_data())
         active_sample_types = unique(sample_data()$sample_type)
         checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
-                                              choices = active_sample_types,
-                                              selected = active_sample_types)
+                           choices = active_sample_types,
+                           selected = active_sample_types)
     })
+    
+
     
     
     ##
@@ -245,21 +218,15 @@ server <- function(input, output, session) {
     
     #running tsne
     server_expression_matrix(input, output, session,
-                             expression_loaded,
+                             app_datasets,
+                             active_dataset,
+                             dataset_downstream,
                              tcga_data,
-                             clinical_loaded,
                              meta_data,
-                             sample_loaded,
                              sample_data,
                              code2type,
                              tsne_input,
-                             tsne_res, 
-                             dataset_downstream = list(sample_groups_A, 
-                                                       sample_groups_B, 
-                                                       DE_res, 
-                                                       DE_fast_raw, 
-                                                       DE_fast_res,
-                                                       DE_res))
+                             tsne_res)
     
     server_tsne(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, sample_data, code2type, FACET_VAR)
     

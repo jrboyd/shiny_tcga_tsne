@@ -1,57 +1,32 @@
 
 server_expression_matrix = function(input, output, session,
-                                    expression_loaded,
+                                    app_datasets,
+                                    active_dataset,
+                                    dataset_downstream,
                                     tcga_data,
-                                    clinical_loaded,
                                     meta_data,
-                                    sample_loaded,
                                     sample_data,
                                     code2type,
                                     tsne_input,
-                                    tsne_res,
-                                    dataset_downstream = list()){
-    
-    #handle change in dataset selection
+                                    tsne_res
+){
     observeEvent({
         input$sel_data
     }, {
-        sel = input$sel_data
-        if(!sel %in% names(expression_files)){
-            stop(sel, " not found in expression_files.")
+        if(!isLoaded(app_datasets[[input$sel_data]])){
+            app_datasets[[input$sel_data]] = LoadAppDataset(app_datasets[[input$sel_data]])
         }
-        #expression data
-        if(is.null(expression_loaded[[sel]])){
-            expression_loaded[[sel]] = load_expression(expression_files[[sel]])
-        }
-        dat = expression_loaded[[sel]]
-        exp_dt = as.data.table(dat)
-        exp_dt$gene_name = rownames(dat)
-        exp_dt = melt(exp_dt, id.vars = "gene_name")
-        exp_dt = exp_dt[, .(value = max(value)), .(gene_name, variable)]
-        # exp_dt = unique(exp_mat$gene_name[duplicated(exp_mat$gene_name)])
-        exp_dt = dcast(exp_dt, gene_name~variable, value.var = "value")
-        exp_mat = as.matrix(exp_dt[, -1])
-        rownames(exp_mat) = exp_dt$gene_name
-
-        stopifnot(!any(duplicated(rownames(exp_mat))))
-        tcga_data(exp_mat)
-        
-        #patient meta data
-        if(!sel %in% names(clinical_loaded)){
-            stop(sel, " not found in loaded metadata.")
-        }
-        if(is.null(clinical_loaded[[sel]])){
-            clinical_loaded[[sel]] = fread(clinical_files[[sel]])
-        }
-        meta_data(clinical_loaded[[sel]])
-        #sample metadata
-        if(!sel %in% names(sample_loaded)){
-            stop(sel, " not found in loaded metadata.")
-        }
-        if(is.null(sample_loaded[[sel]])){
-            sample_loaded[[sel]] = fread(sample_files[[sel]])
-        }
-        sample_data(sample_loaded[[sel]])
+        active_dataset(app_datasets[[input$sel_data]])
+    })
+    
+    #handle change in dataset selection
+    observeEvent({
+        active_dataset()
+    }, {
+        dat = active_dataset()
+        tcga_data(ExpressionMatrix(dat))
+        meta_data(PatientInfo(dat))
+        sample_data(SampleInfo(dat))
         
         #reset downstream
         # browser()
@@ -77,25 +52,4 @@ server_expression_matrix = function(input, output, session,
         tsne_input(tcga_data()[, k])
         tsne_res(NULL)
     })
-    
-    
-    ### patient metadata
-#     observeEvent({
-#         input$sel_data
-#     }, {
-#         sel = input$sel_data
-#         if(!sel %in% names(clinical_loaded)){
-#             stop(sel, " not found in loaded metadata.")
-#         }
-#         # if(is.null(clinical_loaded[[sel]])){
-#         #     clinical_loaded[[sel]] = load_metadata(clinical_files[[sel]])
-#         # }
-#         meta_data(clinical_loaded[[sel]])
-#     })
-#     observe({
-#         showNotification(paste0("metadata: ", nrow(meta_data()), " rows x ", ncol(meta_data()), " columns loaded."))
-#     })
-#     
-# }
-    
 }

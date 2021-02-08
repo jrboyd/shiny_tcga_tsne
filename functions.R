@@ -248,10 +248,40 @@ nn_clust = function(tsne_res, nn = 100, auto_nn_fraction = 5, id_var = "patient_
     
     p_dt
 }
-# ex_files = dir("example_data", full.names = TRUE)
-# # funs = lapply(ex_files, decide_parse_FUN)
-# lapply(ex_files, function(f){
-#     message(f)
-#     decide_parse_FUN(f)
-# })
-# sapply(paste0(ex_files, "bad"), decide_parse_FUN)
+
+#this is not used anywhere
+reinit_data = function(sel){
+    browser()
+    sel = input$sel_data
+    #meta data
+    if(!sel %in% names(clinical_loaded)){
+        stop(sel, " not found in loaded metadata.")
+    }
+    if(is.null(clinical_loaded[[sel]])){
+        clinical_loaded[[sel]] = fread(clinical_files[[sel]])
+    }
+    meta_data(clinical_loaded[[sel]])
+    
+    #expression data
+    if(!sel %in% dataset_names){
+        stop(sel, " not found in expression_files.")
+    }
+    if(is.null(expression_loaded[[sel]])){
+        expression_loaded[[sel]] = load_expression(expression_files[[sel]])
+    }
+    dat = expression_loaded[[sel]]
+    exp_dt = as.data.table(dat)
+    exp_dt$gene_name = rownames(dat)
+    exp_dt = melt(exp_dt, id.vars = "gene_name")
+    exp_dt = exp_dt[, .(value = max(value)), .(gene_name, variable)]
+    # exp_dt = unique(exp_mat$gene_name[duplicated(exp_mat$gene_name)])
+    exp_dt = dcast(exp_dt, gene_name~variable, value.var = "value")
+    exp_mat = as.matrix(exp_dt[, -1])
+    rownames(exp_mat) = exp_dt$gene_name
+    
+    stopifnot(!any(duplicated(rownames(exp_mat))))
+    tcga_data(exp_mat)
+    
+    #reset downstream
+    
+}

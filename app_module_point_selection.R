@@ -96,8 +96,8 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
         updateSelectInput(session, "sel_B_clust", choices = cl, selected = cl[2])
         prev_A_clust = cl[1]
         prev_B_clust = cl[2]
-        sel_A_ids(tsne_clust()[cluster_id %in% cl[1]]$patient_id)
-        sel_B_ids(tsne_clust()[cluster_id %in% cl[2]]$patient_id)
+        sel_A_ids(tsne_clust()[cluster_id %in% cl[1]]$sample_id)
+        sel_B_ids(tsne_clust()[cluster_id %in% cl[2]]$sample_id)
         
     })
     
@@ -118,13 +118,13 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
         if(length(added_clust) > 0){
             new_ids = union(
                 current_ids,
-                tsne_dt[cluster_id %in% added_clust]$patient_id          
+                tsne_dt[cluster_id %in% added_clust]$sample_id          
             )
         }
         if(length(removed_clust) > 0){
             new_ids = setdiff(
                 current_ids,
-                tsne_dt[cluster_id %in% removed_clust]$patient_id          
+                tsne_dt[cluster_id %in% removed_clust]$sample_id          
             )
         }
         new_ids
@@ -154,8 +154,8 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
         tsne_dt = tsne_clust()
         tsne_dt$group = "."
         
-        tsne_dt[patient_id %in% sel_A_ids(), group := "A"]
-        tsne_dt[patient_id %in% sel_B_ids(), group := "B"]
+        tsne_dt[sample_id %in% sel_A_ids(), group := "A"]
+        tsne_dt[sample_id %in% sel_B_ids(), group := "B"]
         
         tsne_dt$group = factor(tsne_dt$group, )
         
@@ -176,7 +176,7 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
     }, {
         brsh = input$plot_A_brush
         tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$patient_id
+        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$sample_id
         
         sel_A_ids(
             union(isolate(sel_A_ids()), 
@@ -189,7 +189,7 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
     }, {
         brsh = input$plot_A_brush
         tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$patient_id
+        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$sample_id
         
         sel_A_ids(
             setdiff(isolate(sel_A_ids()), 
@@ -202,7 +202,7 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
     }, {
         brsh = input$plot_A_brush
         tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$patient_id
+        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$sample_id
         
         sel_A_ids(
             intersect(isolate(sel_A_ids()), 
@@ -215,7 +215,7 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
     }, {
         brsh = input$plot_A_brush
         tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$patient_id
+        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$sample_id
         
         sel_B_ids(
             union(isolate(sel_B_ids()), 
@@ -228,7 +228,7 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
     }, {
         brsh = input$plot_A_brush
         tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$patient_id
+        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$sample_id
         
         sel_B_ids(
             setdiff(isolate(sel_B_ids()), 
@@ -241,7 +241,7 @@ server_point_selection = function(input, output, session, tsne_clust, meta_data,
     }, {
         brsh = input$plot_A_brush
         tsne_dt = tsne_clust()
-        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$patient_id
+        ids_in_rng = tsne_dt[x >= brsh$xmin & x <= brsh$xmax & y >= brsh$ymin & y <= brsh$ymax]$sample_id
         sel_B_ids(
             intersect(isolate(sel_B_ids()), 
                       ids_in_rng)    

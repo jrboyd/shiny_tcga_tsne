@@ -87,9 +87,7 @@ ui <- fluidPage(
                  sidebarLayout(
                      sidebarPanel(
                          selectInput("sel_data", label = "TCGA data", choices = dataset_names),
-                         checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
-                                            choices = code2type, 
-                                            selected = code2type),
+                         uiOutput("dynamic_sel_sample_type_filter"),
                          radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)), #c("none", "sample type", "PAM50")),
                          radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE, selected = "PAM50"),
                          disabled((selectInput("sel_custom_gene_set", label = "Custom gene lists", choices = ""))),
@@ -165,6 +163,19 @@ server <- function(input, output, session) {
             gl = sort(unique(gl))
         }
         input_genes(gl)
+    })
+    
+    # uiOutput("dynamic_sel_sample_type_filter"),
+    # checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
+    #                    choices = code2type, 
+    #                    selected = code2type),
+    
+    output$dynamic_sel_sample_type_filter =  renderUI({
+        req(sample_data())
+        active_sample_types = unique(sample_data()$sample_type)
+        checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 
+                                              choices = active_sample_types,
+                                              selected = active_sample_types)
     })
     
     

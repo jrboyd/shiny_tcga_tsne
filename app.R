@@ -303,10 +303,6 @@ server <- function(input, output, session) {
     
     observeEvent({
         input$btn_runDEfast
-        # tsne_input()
-        # sample_groups
-        # sample_groups_A()
-        # sample_groups_B()
     }, {
         req(tsne_input())
         req(sample_groups)

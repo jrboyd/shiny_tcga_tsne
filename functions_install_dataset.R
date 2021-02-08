@@ -66,7 +66,7 @@ if(FALSE){
     # brca_clin[, .(vital_status, days_to_last_follow_up, days_to_death)][vital_status == "alive"][order(days_to_death)]
     # brca_clin[, .(vital_status, days_to_last_follow_up, days_to_death)][vital_status != "alive"][order(days_to_last_follow_up)]
     brca_clin = brca_clin[, .(submitter_id, gender, year_of_birth, race, ethnicity, primary_diagnosis, tumor_stage, age_at_diagnosis, days_to_birth, days_to_death, days_to_last_follow_up, vital_status)]
-    brca_clin = merge(brca_clin, brca_pam50_class, by = "submitter_id")
+    # brca_clin = merge(brca_clin, brca_pam50_class, by = "submitter_id")
     brca_clin
     
     sample_codes = function(sample_ids){
@@ -107,6 +107,7 @@ if(FALSE){
                     sample_data = sample_dts$BRCA)
     
     target_exp_dt = fread("../SF_target_RNAseq/TARGET_expression_wide.csv")
+    target_exp_dt = target_exp_dt[, -"RNA-Seq.PBDC-PB.TARGET-15-SJMPAL011911-03A.1-01D"]
     target_exp_dt[1:5, 1:5]
     
     target_surv_dt = fread("../SF_target_RNAseq/clinical_merged.survival.csv")
@@ -133,10 +134,15 @@ if(FALSE){
     dim(tmp2)
     dim(target_exp_dt)
     
+    target_sample_dt = sample_codes(colnames(target_exp_dt)[-1])
+    target_sample_dt = target_sample_dt[patient_id %in% target_clinical_dt$patient_id]
+    
+    tmp3 = tmp2[, colnames(tmp2) %in% c("gene_name", target_sample_dt$sample_id), with = FALSE]
+    
     install_dataset(dataset_dirname = "TARGET", 
-                    expression_data = tmp2, 
+                    expression_data = tmp3, 
                     clinical_data = target_clinical_dt, 
-                    sample_data = sample_codes(colnames(target_exp_dt)[-1]))
+                    sample_data = target_sample_dt)
     }
     
 }

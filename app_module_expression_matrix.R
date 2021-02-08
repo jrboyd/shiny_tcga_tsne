@@ -74,14 +74,6 @@ server_expression_matrix = function(input, output, session,
         
         samp_dt = samp_dt[sample_type %in% sel_types]
         k = colnames(tcga_data()) %in% samp_dt$sample_id
-        
-        # sel_types = "Primary Solid Tumor"
-        # sample_codes = sub("[A-Z]", "", sapply(strsplit(colnames(tcga_data()), "-"), function(x)x[4]))
-        # sample_types = code2type[sample_codes]
-        # k = toupper(sample_types) %in% toupper(input$sel_sample_type_filter)
-        # tsne_dt[, sample_code := tstrsplit(bcr_patient_barcode, "-", keep = 4)]
-        # tsne_dt[, sample_code := sub("[A-Z]", "", sample_code)]
-        # tsne_dt[, sample_type := code2type[sample_code]]
         tsne_input(tcga_data()[, k])
         tsne_res(NULL)
     })

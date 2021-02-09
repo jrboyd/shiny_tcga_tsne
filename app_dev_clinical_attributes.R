@@ -114,7 +114,8 @@ server2 <- function(input, output, session) {
                 theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
         }else{
             ggplot(clin_dt, aes_string(x = sel_var)) +
-                geom_bar()
+                geom_bar() +
+                theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
         }
     })
 }

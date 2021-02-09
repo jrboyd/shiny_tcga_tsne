@@ -7,7 +7,7 @@ if(FALSE){
         code_dt = fread("sample_codes.txt", colClasses = rep("character", 3), col.names = c("sample_code", "sample_type", "sample_type_short"))
         
         expression_files = list(
-            BRCA_tiny = "data/BRCA_TCGA_expression.tiny.csv",
+            BRCA_tiny = "data/BRCA_TCGA_expression.tiny2.csv",
             BRCA = "data/BRCA_TCGA_expression.csv"
         )
         

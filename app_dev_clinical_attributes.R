@@ -15,6 +15,7 @@ source("app_module_tsne.R")
 source("app_module_gene_xy_vis.R")
 source("app_module_point_selection.R")
 source("app_module_diff_expression.R")
+source('app_module_metadata.R')
 source("functions.R")
 # based on analyze_BRCA_tsne_allGenes_plusCells.R
 
@@ -39,7 +40,10 @@ ui2 <- fluidPage(
     titlePanel("development for clinical module"),
     selectInput("sel_data", label = "TCGA data", choices = dataset_names),
     uiOutput("dynamic_sel_clinical"),
-    shinycssloaders::withSpinner(plotOutput("plot_attribute"))
+    shinycssloaders::withSpinner(plotOutput("plot_attribute")),
+    ui_metadata("patient"),
+    ui_metadata("sample")
+    
 )
 
 server2 <- function(input, output, session) {
@@ -57,7 +61,7 @@ server2 <- function(input, output, session) {
     
     #metadata for patient entries
     meta_data = reactiveVal()
-    sel_clinical_var = reactiveVal()
+    # sel_clinical_var = reactiveVal()
     #metadata for sample entries
     sample_data = reactiveVal()
     active_dataset = reactiveVal()
@@ -67,8 +71,15 @@ server2 <- function(input, output, session) {
     #tsne_res with clustering applied
     tsne_clust = reactiveVal()
     
+    
+
+    
+    sel_patient_var = server_metadata(input, output, session, meta_data, Name = "Patient")
+    sel_sample_var = server_metadata(input, output, session, sample_data, Name = "Sample")
+    
     dataset_downstream = list(
-        sel_clinical_var
+        sel_patient_var,
+        sel_sample_var
         # sample_groups_A, 
         # sample_groups_B, 
         # DE_res, 
@@ -88,6 +99,8 @@ server2 <- function(input, output, session) {
                              tsne_input,
                              tsne_res)
     
+    sel_clinical_var = reactiveVal()
+    
     output$dynamic_sel_clinical = renderUI({
         req(meta_data())
         clin_var = colnames(meta_data())
@@ -95,13 +108,13 @@ server2 <- function(input, output, session) {
         sapply(meta_data()[, clin_var, with = FALSE], class)
         selectInput("sel_clinical", label = "Attributes", choices = clin_var)
     })
-    
+
     observeEvent({
-        input$sel_clinical
+        input[["sel_clinical"]]
     },{
         sel_clinical_var(input$sel_clinical)
     })
-    
+
     output$plot_attribute = renderPlot({
         input$sel_data
         req(meta_data())

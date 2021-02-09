@@ -15,6 +15,7 @@ library(digest)
 library(shinyjs)
 library(shinycssloaders)
 
+source("AppDataset.R")
 source("setup_gene_lists.R")
 source("setup_datasets.R")
 source("app_module_expression_matrix.R")

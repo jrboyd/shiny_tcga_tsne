@@ -41,8 +41,8 @@ ui2 <- fluidPage(
     selectInput("sel_data", label = "TCGA data", choices = dataset_names),
     uiOutput("dynamic_sel_clinical"),
     shinycssloaders::withSpinner(plotOutput("plot_attribute")),
-    ui_metadata("patient"),
-    ui_metadata("sample")
+    metadataUI("Patient"),
+    metadataUI("Sample")
     
 )
 
@@ -74,8 +74,8 @@ server2 <- function(input, output, session) {
     
 
     
-    sel_patient_var = server_metadata(input, output, session, meta_data, Name = "Patient")
-    sel_sample_var = server_metadata(input, output, session, sample_data, Name = "Sample")
+    sel_patient_var = metadataServer(meta_data, Name = "Patient")
+    sel_sample_var = metadataServer(sample_data, Name = "Sample")
     
     dataset_downstream = list(
         sel_patient_var,

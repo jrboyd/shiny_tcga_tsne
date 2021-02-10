@@ -39,8 +39,6 @@ ui2 <- fluidPage(
     useShinyjs(),
     titlePanel("development for clinical module"),
     selectInput("sel_data", label = "TCGA data", choices = dataset_names),
-    uiOutput("dynamic_sel_clinical"),
-    shinycssloaders::withSpinner(plotOutput("plot_attribute")),
     metadataUI("Patient"),
     metadataUI("Sample")
     
@@ -99,38 +97,6 @@ server2 <- function(input, output, session) {
                              tsne_input,
                              tsne_res)
     
-    sel_clinical_var = reactiveVal()
-    
-    output$dynamic_sel_clinical = renderUI({
-        req(meta_data())
-        clin_var = colnames(meta_data())
-        clin_var = setdiff(clin_var, "patient_id")
-        sapply(meta_data()[, clin_var, with = FALSE], class)
-        selectInput("sel_clinical", label = "Attributes", choices = clin_var)
-    })
-
-    observeEvent({
-        input[["sel_clinical"]]
-    },{
-        sel_clinical_var(input$sel_clinical)
-    })
-
-    output$plot_attribute = renderPlot({
-        input$sel_data
-        req(meta_data())
-        sel_var = sel_clinical_var()
-        req(sel_var)
-        clin_dt = meta_data()#[, c(sel_var, "patient_id"), with = FALSE]
-        if(is.numeric(clin_dt[[sel_var]])){
-            ggplot(clin_dt, aes_string(x = sel_var)) +
-                geom_histogram() +
-                theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
-        }else{
-            ggplot(clin_dt, aes_string(x = sel_var)) +
-                geom_bar() +
-                theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
-        }
-    })
 }
 
 # Run the application 

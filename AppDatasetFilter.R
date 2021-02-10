@@ -1,4 +1,4 @@
-setClass("AppDatasetFilter", 
+setClass("Filter", 
          representation(
              var = "character",
              inverse = "logical",
@@ -6,8 +6,8 @@ setClass("AppDatasetFilter",
          )
 )
 
-setClass("AppDatasetFilterNumeric", 
-         contains = "AppDatasetFilter", 
+setClass("FilterNumeric", 
+         contains = "Filter", 
          representation(
              min_val = "numeric", 
              max_val = "numeric",
@@ -16,21 +16,21 @@ setClass("AppDatasetFilterNumeric",
          )
 )
 
-setClass("AppDatasetFilterCharacter", 
-         contains = "AppDatasetFilter", 
+setClass("FilterCharacter", 
+         contains = "Filter", 
          representation(
              one_of = "character"
          )
 )
 
-AppDatasetFilterNumeric = function(var, 
+FilterNumeric = function(var, 
                                    inverse = FALSE, 
                                    min_val = -Inf, 
                                    max_val = Inf,
                                    min_inclusive = FALSE,
                                    max_inclusive = FALSE, 
                                    drop_NA = TRUE){
-    new("AppDatasetFilterNumeric", 
+    new("FilterNumeric", 
         var = var, 
         inverse = inverse,
         min_val = min_val,
@@ -40,23 +40,23 @@ AppDatasetFilterNumeric = function(var,
         drop_NA = drop_NA)
 }
 
-AppDatasetFilterCharacter = function(var, 
+FilterCharacter = function(var, 
                                      inverse = FALSE, 
                                      one_of = character(), 
                                      drop_NA = TRUE){
-    new("AppDatasetFilterCharacter", 
+    new("FilterCharacter", 
         var = var, 
         inverse = inverse,
         one_of = one_of,
         drop_NA = drop_NA)
 }
 
-setMethod("show", "AppDatasetFilter", function(object){
+setMethod("show", "Filter", function(object){
     msg = "NYI"
     return(msg)
 })
 
-setMethod("as.character", "AppDatasetFilterCharacter", function(x){
+setMethod("as.character", "FilterCharacter", function(x){
     msg = paste(x@var, "is not filtered.")
     if(length(x@one_of) > 0){
         msg = paste0("in (", paste(x@one_of, collapse = ", "),")")
@@ -69,7 +69,7 @@ setMethod("as.character", "AppDatasetFilterCharacter", function(x){
     return(msg)
 })
 
-setMethod("as.character", "AppDatasetFilterNumeric", function(x){
+setMethod("as.character", "FilterNumeric", function(x){
     msg = paste(x@var, "not filtered.")
     min_sym = ifelse(x@min_inclusive, ">=", ">")
     max_sym = ifelse(x@max_inclusive, "<=", "<")
@@ -91,11 +91,11 @@ setMethod("as.character", "AppDatasetFilterNumeric", function(x){
     return(msg)
 })
 
-setMethod("show", "AppDatasetFilterCharacter", function(object){
+setMethod("show", "FilterCharacter", function(object){
     message(as.character(object))
 })
 
-setMethod("show", "AppDatasetFilterNumeric", function(object){
+setMethod("show", "FilterNumeric", function(object){
     message(as.character(object))
 })
 
@@ -155,11 +155,11 @@ setMethod("show", "AppDatasetFilterNumeric", function(object){
 
 setGeneric("applyFilter", function(df, object){standardGeneric("applyFilter")})
 
-setMethod("applyFilter", c("data.frame", "AppDatasetFilter"), function(df, object){
-    stop("applyFilter: use AppDatasetFilterNumeric or AppDatasetFilterCharacter")
+setMethod("applyFilter", c("data.frame", "Filter"), function(df, object){
+    stop("applyFilter: use FilterNumeric or FilterCharacter")
 })
 
-setMethod("applyFilter", c("data.frame", "AppDatasetFilterNumeric"), function(df, object){
+setMethod("applyFilter", c("data.frame", "FilterNumeric"), function(df, object){
     .numeric_filter(df,
                     var = object@var,
                     min_val = object@min_val,
@@ -170,7 +170,7 @@ setMethod("applyFilter", c("data.frame", "AppDatasetFilterNumeric"), function(df
                     drop_NA = object@drop_NA
     )
 })
-setMethod("applyFilter", c("data.frame", "AppDatasetFilterCharacter"), function(df, object){
+setMethod("applyFilter", c("data.frame", "FilterCharacter"), function(df, object){
     .character_filter(df,
                       var = object@var,
                       one_of = object@one_of,
@@ -180,23 +180,23 @@ setMethod("applyFilter", c("data.frame", "AppDatasetFilterCharacter"), function(
 
 
 
-AppDatasetFilterNumeric("num")
+FilterNumeric("num")
 
 
-AppDatasetFilterNumeric("num", min_val = 2, max_val = 2)
-AppDatasetFilterNumeric("num", min_val = 2, max_val = 2, inverse = TRUE)
-AppDatasetFilterNumeric("num", min_val = 2, max_val = 4, min_inclusive = TRUE, max_inclusive = TRUE)
-AppDatasetFilterNumeric("num", min_val = 2, max_val = 4, inverse = TRUE)
+FilterNumeric("num", min_val = 2, max_val = 2)
+FilterNumeric("num", min_val = 2, max_val = 2, inverse = TRUE)
+FilterNumeric("num", min_val = 2, max_val = 4, min_inclusive = TRUE, max_inclusive = TRUE)
+FilterNumeric("num", min_val = 2, max_val = 4, inverse = TRUE)
 
-AppDatasetFilterCharacter("char")
-AppDatasetFilterCharacter("char", one_of = c("a", "c"))
-AppDatasetFilterCharacter("char", one_of = c("a", "c", "asdf"), inverse = TRUE)
-
-
+FilterCharacter("char")
+FilterCharacter("char", one_of = c("a", "c"))
+FilterCharacter("char", one_of = c("a", "c", "asdf"), inverse = TRUE)
 
 
 
-object = AppDatasetFilterNumeric("days_to_last_follow_up", min_val = 50, max_val = 100)
+
+
+object = FilterNumeric("days_to_last_follow_up", min_val = 50, max_val = 100)
 var = object@var
 min_val = object@min_val
 max_val = object@max_val
@@ -206,8 +206,8 @@ inverse = object@inverse
 drop_NA = object@drop_NA
 
 num_filter = object
-char_filter = AppDatasetFilterCharacter("ethnicity", one_of = c("not reported"), inverse = TRUE)
-char_filter2 = AppDatasetFilterCharacter("vital_status", one_of = c("alive"))
+char_filter = FilterCharacter("ethnicity", one_of = c("not reported"), inverse = TRUE)
+char_filter2 = FilterCharacter("vital_status", one_of = c("alive"))
 
 as.character(num_filter)
 as.character(char_filter)

@@ -56,41 +56,47 @@ setMethod("show", "AppDatasetFilter", function(object){
     return(msg)
 })
 
-setMethod("show", "AppDatasetFilterCharacter", function(object){
-    msg = paste(object@var, "is not filtered.")
-    if(length(object@one_of) > 0){
-        msg = paste0("one of (", paste(object@one_of, collapse = ", "),")")
-        if(object@inverse){
-            msg = paste0(object@var, " must NOT be ", msg)
+setMethod("as.character", "AppDatasetFilterCharacter", function(x){
+    msg = paste(x@var, "is not filtered.")
+    if(length(x@one_of) > 0){
+        msg = paste0("in (", paste(x@one_of, collapse = ", "),")")
+        if(x@inverse){
+            msg = paste0(x@var, " NOT ", msg)
         }else{
-            msg = paste0(object@var, " must be ", msg)
+            msg = paste0(x@var, " is ", msg)
         }
     }
-    message(msg)
     return(msg)
 })
 
-setMethod("show", "AppDatasetFilterNumeric", function(object){
-    msg = paste(object@var, "is not filtered.")
-    min_sym = ifelse(object@min_inclusive, ">=", ">")
-    max_sym = ifelse(object@max_inclusive, "<=", "<")
-    if(is.finite(object@min_val) & is.finite(object@max_val)){
-        if(object@min_val == object@max_val){
-            msg = paste(object@var, "==", object@min_val)    
+setMethod("as.character", "AppDatasetFilterNumeric", function(x){
+    msg = paste(x@var, "not filtered.")
+    min_sym = ifelse(x@min_inclusive, ">=", ">")
+    max_sym = ifelse(x@max_inclusive, "<=", "<")
+    if(is.finite(x@min_val) & is.finite(x@max_val)){
+        if(x@min_val == x@max_val){
+            msg = paste(x@var, "==", x@min_val)    
         }else{
-            msg = paste(object@var, min_sym, object@min_val, "and", max_sym, object@max_val)    
+            msg = paste(x@var, min_sym, x@min_val, "and", max_sym, x@max_val)    
         }
-    }else if(is.finite(object@min_val)){
-        msg = paste(object@var, min_sym, object@min_val)
-    }else if(is.finite(object@max_val)){
-        msg = paste(object@var, max_sym, object@max_val)
+    }else if(is.finite(x@min_val)){
+        msg = paste(x@var, min_sym, x@min_val)
+    }else if(is.finite(x@max_val)){
+        msg = paste(x@var, max_sym, x@max_val)
     }
     
-    if(object@inverse){
+    if(x@inverse){
         msg = paste0("not(", msg, ")")
     }
-    message(msg)
     return(msg)
+})
+
+setMethod("show", "AppDatasetFilterCharacter", function(object){
+    message(as.character(object))
+})
+
+setMethod("show", "AppDatasetFilterNumeric", function(object){
+    message(as.character(object))
 })
 
 
@@ -200,10 +206,11 @@ inverse = object@inverse
 drop_NA = object@drop_NA
 
 num_filter = object
-
-
 char_filter = AppDatasetFilterCharacter("ethnicity", one_of = c("not reported"), inverse = TRUE)
 char_filter2 = AppDatasetFilterCharacter("vital_status", one_of = c("alive"))
+
+as.character(num_filter)
+as.character(char_filter)
 
 library(data.table)
 df = fread("installed_datasets/BRCA_tiny/clinical.csv")

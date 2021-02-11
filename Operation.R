@@ -443,7 +443,7 @@ TransformCopy = function(var, new_var){
 }
 
 setMethod("as.character", c("TransformCopy"), function(x){
-    paste(x@var, "copy", x@var, "to", x@new_var)
+    paste(x@var, "copy to", x@new_var)
 })
 setMethod("show", c("TransformCopy"), function(object){
     message(as.character(object))  

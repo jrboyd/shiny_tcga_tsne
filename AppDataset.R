@@ -50,14 +50,22 @@ check_AppDataset = function(object){
 
 setClass("AppDataset", representation(
     name = "character",
+    #files
     expression_file = "character", 
     sample_file = "character",
     clinical_file = "character", 
     info_file = "character",
+    #raw data
     expression_data = "matrix",
     sample_data = "data.frame",
     clinical_data = "data.frame",
     info_data = "data.frame",
+    #processed data
+    processing_steps
+    expression_processed = "matrix",
+    sample_processed = "data.frame",
+    clinical_processed = "data.frame",
+    
     is_loaded = "logical"), 
     validity = check_AppDataset)
 

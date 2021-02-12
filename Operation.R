@@ -454,6 +454,67 @@ setMethod("applyOperation", c("data.frame", "TransformCopy"), function(df, objec
     df
 })
 
+#######
+setClass("Append",
+         representation(
+             new_var = "character",
+             values = "ANY"
+         ),
+         contains = "Operation"
+         
+)
+
+setMethod("as.character", c("Append"), function(x){
+    paste(x@var, "append values as", x@new_var)
+})
+setMethod("show", c("Append"), function(object){
+    message(as.character(object))  
+})
+setMethod("applyOperation", c("data.frame", "Append"), function(df, object){
+    if(!all(df[[object@var]] %in% names(object@values))){
+        stop("items missing from values")
+    }
+    df[[object@new_var]] = object@values[df[[object@var]]]
+    df
+})
+
+#######
+
+setClass("AppendNumeric", 
+         representation(
+             values = "numeric"
+         ),
+         contains = "Append"
+)
+
+AppendNumeric = function(var, new_var, values){
+    new("AppendNumeric", var = var, new_var = new_var, values = values)
+}
+
+
+#######
+setClass("AppendCharacter", 
+         representation(
+             values = "character"
+         ),
+         contains = "Append"
+)
+
+AppendCharacter = function(var, new_var, values){
+    new("AppendCharacter", var = var, new_var = new_var, values = values)
+}
+#######
+setClass("AppendFactor", 
+         representation(
+             values = "factor"
+         ),
+         contains = "Append"
+)
+
+AppendFactor = function(var, new_var, values){
+    new("AppendFactor", var = var, new_var = new_var, values = values)
+}
+
 #informal tests
 if(FALSE){
     {
@@ -585,5 +646,17 @@ if(FALSE){
         df2 = applyOperation(df, tst) %>%
             applyOperation(TransformRank("year_of_birth_ranked"))
         plot(df2$year_of_birth, df2$year_of_birth_ranked)
+        
+        samp = data.table::fread("installed_datasets/BRCA_tiny/samples.csv")
+        exp = fread("installed_datasets/BRCA_tiny/expression.csv")
+        
+        vals = suppressWarnings({as.numeric(exp[gene_name == "TIMP1"])[-1]})
+        names(vals) = colnames(exp)[-1]
+        tst = ifelse(vals > mean(vals), "high", "low")
+        append_exp = AppendNumeric("sample_id", "TIMP1_expression", vals)
+        append_tst = AppendCharacter("sample_id", "TIMP1_highlow", tst)
+        
+        applyOperation(samp, append_exp) %>%
+            applyOperation(append_tst)
     }   
 }

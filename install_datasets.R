@@ -103,6 +103,14 @@ if(FALSE){
         
         tmp3 = tmp2[, colnames(tmp2) %in% c("gene_name", target_sample_dt$sample_id), with = FALSE]
         
+        snp_dt = fread("ik_snps_annotated.csv")
+        del_dt = snp_dt[group %in% c("SIFT", "polyphen")]
+        traits = del_dt[, .N, .(Trait, group)]$Trait
+        traits2simp = c("Deleterious", "Mixed", "Mixed", "Tolerated", "Tolerated", "Deleterious", "Mixed")
+        names(traits2simp) = traits
+        del_dt[, simple_trait := traits2simp[Trait]]
+        table(del_dt$simple_trait)
+        
         InstallDataset(dataset_dirname = "TARGET", 
                        expression_data = tmp3, 
                        clinical_data = target_clinical_dt, 

@@ -61,7 +61,6 @@ setClass("AppDataset", representation(
     clinical_data = "data.frame",
     info_data = "data.frame",
     #processed data
-    processing_steps
     expression_processed = "matrix",
     sample_processed = "data.frame",
     clinical_processed = "data.frame",

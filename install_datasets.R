@@ -110,6 +110,14 @@ if(FALSE){
         names(traits2simp) = traits
         del_dt[, simple_trait := traits2simp[Trait]]
         table(del_dt$simple_trait)
+        any(duplicated(del_dt$sample))
+        del_dt$simple_trait = factor(del_dt$simple_trait, levels = c("Deleterious", "Mixed", "Tolerated"))
+        del_dt[, sample_id := sub("\\.SRR.+", "", sample)]
+        simple_del_dt =del_dt[order(simple_trait)][!duplicated(sample_id)][, .(sample_id, simple_snp = simple_trait)]
+        
+        target_sample_dt =merge(target_sample_dt, simple_del_dt, by = "sample_id", all.x = TRUE)
+        target_sample_dt[is.na(simple_snp), simple_snp := "No AA Impact"]
+        table(target_sample_dt$simple_snp)
         
         InstallDataset(dataset_dirname = "TARGET", 
                        expression_data = tmp3, 

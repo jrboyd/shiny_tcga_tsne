@@ -247,7 +247,55 @@ InstallDataset = function(dataset_dirname,
     
 }
 
+appDat = CreateAppDataset.installed("installed_datasets/BRCA_tiny/")
+appDat = LoadAppDataset(appDat)
 
+as_id = function(Name){
+    gsub(" ", "_", tolower(Name))
+}
 
+UI.GenClinicalFilter = function(appDat, Name = "clinical_filter"){
+    id = as_id(Name)
+    ns = NS(id)
+    cn = setdiff(colnames(SampleInfo(appDat)), "sample_id")
+    tagList(
+        selectizeInput(label = "Clinical Filter", ns("sel_var"), choices = cn),
+        uiOutput(ns("filter_ui"))
+    )
+    
+}
+
+Server.GenClinicalFilter = function(appDat, Name = "clinical_filter"){
+    id = as_id(Name)
+    moduleServer(
+        id,
+        function(input, output, session){
+            
+            # observeEvent({
+            #     input$sel_var
+            # }, {
+            #     
+            # })
+            
+            output$filter_ui = renderUI({
+                var = input$sel_var
+                if(is.null(var)){
+                    msg = "waiting"
+                }else[
+                    msg = paste("UI for", var)
+                ]
+                tags$h3(msg)
+            })
+            
+        }
+    )
+}
+
+UI.GenSampleFilter
+
+UI.GenClinicalTransform
+UI.GenSampleTransform
+
+UI.GenSampleAddExpression
 
 

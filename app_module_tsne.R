@@ -63,7 +63,7 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
             showNotification("Need more valid genes/samples to run t-sne.", type = "error")
             tsne_res(NULL)
         }
-})
+    })
     
     ### Plot t-sne
     output$plot_tsne <- renderPlot({
@@ -72,13 +72,19 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
         tsne_dt = tsne_res()
         tsne_dt = merge(tsne_dt, meta_data(), by = "patient_id")
         # browser()
-        if(input$sel_color_by == "sample type"){ #c("sample type", "PAM50")
-            p = ggplot(tsne_dt, aes(x = x, y = y, color = sample_type)) 
-        }else if(input$sel_color_by == "PAM50"){
-            p = ggplot(tsne_dt, aes(x = x, y = y, color = pam_call)) 
+        # if(input$sel_color_by == "sample type"){ #c("sample type", "PAM50")
+        #     p = ggplot(tsne_dt, aes(x = x, y = y, color = sample_type)) 
+        # }else if(input$sel_color_by == "PAM50"){
+        #     p = ggplot(tsne_dt, aes(x = x, y = y, color = pam_call)) 
+        # }else{
+        #     stop("unrecognized input$sel_color_by: ", input$sel_color_by)
+        # }
+        if(input$sel_color_by ==  FACET_VAR$NONE){
+            p = ggplot(tsne_dt, aes_string(x = "x", y = "y")) 
         }else{
-            stop("unrecognized input$sel_color_by: ", input$sel_color_by)
+            p = ggplot(tsne_dt, aes_string(x = "x", y = "y", color = input$sel_color_by))     
         }
+        
         if(input$sel_facet_var != FACET_VAR$NONE){
             p = p + annotate("point", x= tsne_dt$x, y = tsne_dt$y, color = 'gray70', size = .3)
         }
@@ -88,18 +94,20 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
             labs(x = "", y = "", title = "t-sne of TCGA samples", subtitle = paste(input$sel_gene_list, "gene list")) +
             theme(panel.background = element_blank(),
                   panel.grid = element_blank())
-        if(input$sel_facet_var == FACET_VAR$NONE){
-            p
-        }else if(input$sel_facet_var == FACET_VAR$SAMPLE_TYPE){
-            p + facet_wrap(~sample_type)
-        }else if(input$sel_facet_var == FACET_VAR$PAM50){
-            p + facet_wrap(~pam_call)
-        }else{
-            stop("unrecognized input$sel_facet_var: ", input$sel_facet_var)
+        if(input$sel_facet_var != FACET_VAR$NONE){
+            p = p + facet_wrap(paste0("~", input$sel_facet_var))
         }
+        # }else if(input$sel_facet_var == FACET_VAR$SAMPLE_TYPE){
+        #     p + facet_wrap(~sample_type)
+        # }else if(input$sel_facet_var == FACET_VAR$PAM50){
+        #     p + facet_wrap(~pam_call)
+        # }else{
+        #     stop("unrecognized input$sel_facet_var: ", input$sel_facet_var)
+        # }
+        p
     })
     
     
     
     tsne_res
-    }
+}

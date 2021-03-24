@@ -52,16 +52,11 @@ ui <- fluidPage(
                  sidebarLayout(
                      sidebarPanel(
                          selectInput("sel_data", label = "TCGA data", choices = dataset_names),
-                         uiOutput("dynamic_sel_sample_type_filter"),
+                         uiOutput("ui_sel_sample_type_filter"),
                          uiOutput("ui_sel_facet_var"),
                          uiOutput("ui_sel_gene_list"),
-                         # radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)), #c("none", "sample type", "PAM50")),
-                         # radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE, selected = "PAM50"),
                          disabled((selectInput("sel_custom_gene_set", label = "Custom gene lists", choices = ""))),
                          uiOutput("ui_sel_color_by"),
-                         # radioButtons("sel_color_by", label = "Color By", choices = c("sample type", "PAM50")),
-                         # radioButtons("sel_facet_by", label = "Facet By", choices = c("sample type", "PAM50")),
-                         
                          selectInput("txtGene", label = "Select Gene To Plot", choices = NULL),
                      ),
                      mainPanel(
@@ -128,7 +123,13 @@ server <- function(input, output, session) {
     )
     
     output$ui_sel_facet_var = renderUI({
-        radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)) #c("none", "sample type", "PAM50")),    
+        dt = sample_data()
+        req(dt)
+        n_unique = sapply(colnames(dt), function(nam){
+            length(unique(dt[[nam]]))
+        })
+        facet_vars = names(n_unique)[n_unique <= 16]
+        radioButtons("sel_facet_var", label = "Facet By", choices = facet_vars)
     })
     
     output$ui_sel_gene_list = renderUI({
@@ -139,7 +140,13 @@ server <- function(input, output, session) {
     })
     
     output$ui_sel_color_by  = renderUI({
-        radioButtons("sel_color_by", label = "Color By", choices = c("sample type", "PAM50"))
+        dt = sample_data()
+        req(dt)
+        n_unique = sapply(colnames(dt), function(nam){
+            length(unique(dt[[nam]]))
+        })
+        facet_vars = names(n_unique)[n_unique <= 8]
+        radioButtons("sel_color_by", label = "Color By", choices = facet_vars)
     })
     
     
@@ -161,7 +168,7 @@ server <- function(input, output, session) {
         input_genes(gl)
     })
     
-    output$dynamic_sel_sample_type_filter =  renderUI({
+    output$ui_sel_sample_type_filter =  renderUI({
         req(sample_data())
         active_sample_types = unique(sample_data()$sample_type)
         checkboxGroupInput("sel_sample_type_filter", label = "Samples Included", 

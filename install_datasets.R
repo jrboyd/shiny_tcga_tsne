@@ -59,6 +59,18 @@ if(FALSE){
             merge(x, pam_dt, by = "sample_id")
         })
         
+        brca_clin$gender  = factor(brca_clin$gender, levels = c("female", "male", "--"))
+        
+        stage_lev = c("stage i", "stage ia", "stage ib", "stage ii", 
+                      "stage iia", "stage iib", "stage iii", 
+                      "stage iiia", "stage iiib", "stage iiic", 
+                      "stage iv", "stage x", "not reported", "--")
+        
+        brca_clin$tumor_stage = factor(brca_clin$tumor_stage, levels = stage_lev)
+        
+        sample_dts$BRCA$sample_type = factor(sample_dts$BRCA$sample_type, levels = c("Solid Tissue Normal", "Primary Solid Tumor", "Metastatic"))
+        sample_dts$BRCA_tiny$sample_type = factor(sample_dts$BRCA_tiny$sample_type, levels = c("Solid Tissue Normal", "Primary Solid Tumor", "Metastatic"))
+        
         # setnames(clin_dt, c("Vital.Status", "Overall.Survival.Time.in.Days"), c("vital_status", "days_to_last_follow_up"))
         # clin_dt[, days_to_death := ifelse(vital_status == "Dead", days_to_last_follow_up, NA) ]
         InstallDataset(dataset_dirname = "BRCA_tiny", 

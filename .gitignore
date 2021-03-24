@@ -11,3 +11,5 @@ diff_data.Rds
 installed_datasets
 tmp.save
 ik_snps_annotated.csv
+*.png
+ikaros_data

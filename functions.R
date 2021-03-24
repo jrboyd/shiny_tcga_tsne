@@ -285,3 +285,152 @@ reinit_data = function(sel){
     #reset downstream
     
 }
+
+library("DESeq2")
+library("BiocParallel")
+library(ggplot2)
+NCORES = 10
+
+run_group.fast = function(exp_mat, a, b, min_fraction = .5){
+    # browser()
+    if("reactiveVal" %in% class(a)){
+        a = a()
+    }
+    if("reactiveVal" %in% class(b)){
+        b = b()
+    }
+    dt = as.data.table(reshape2::melt(exp_mat[, c(a, b)]))
+    setnames(dt, c("Var1", "Var2", "value"), c("gene_name", "id", "expression"))
+    dt[, group := ifelse(id %in% a, "A", "B")]
+    dt
+}
+
+run_DE.fast = function(dt){
+    # system.time({
+    # dt[, .(mean_val = mean(expression), 
+    #        sd_val = sd(expression), 
+    #        q25_val = quantile(expression, .25),
+    #        q50_val = quantile(expression, .50),
+    #        q75_val = quantile(expression, .75)
+    # ), .(gene_name, group)]
+    # })
+    
+    # system.time({
+    p_dt = dt[, .(mean_val = mean(expression)
+    ), .(gene_name, group)]
+    # })
+    p_dt = dcast(p_dt, gene_name~group, value.var = "mean_val")
+    
+    ps = 100
+    p_dt[, lg2_fc := log2((B + ps) / (A + ps))]
+    p_dt[, lg2_min := log2(pmin(A, B)+ps)]
+    
+    p_dt
+}
+
+run_survival_by_patients = function(surv_dt, impacted_patients, legend_title = "impacted"){
+    surv_dt[, impacted := patient_id %in% impacted_patients]
+    
+    res = TCGAbiolinks::TCGAanalyze_survival(as.data.frame(surv_dt), 
+                               "impacted", legend = legend_title,
+                               height = 10, 
+                               width=10, 
+                               filename = NULL)
+    pval = res$plot$layers[[5]]$geom_params$label
+    pval = as.numeric(sub("p [=<>] ", "", pval))
+    res$pval = pval
+    res
+}
+
+run_DE = function(exp_mat, a, b, min_fraction = .5, on_windows = FALSE, max_padj = .01, min_baseMean = 10, min_log2FoldChange = 3){
+    if("reactiveVal" %in% class(a)){
+        a = a()
+    }
+    if("reactiveVal" %in% class(b)){
+        b = b()
+    }
+    # saveRDS(list(exp_mat = exp_mat, a = a, b = b, min_fraction = min_fraction ), "diff_data.Rds")
+    sample_info = data.table(id = c(a, b), group = factor(c(rep("A", length(a)), rep("B", length(b)))))
+    
+    if(on_windows){
+        register(SnowParam(NCORES))    
+    }else{
+        register(MulticoreParam(NCORES))
+    }
+    
+    
+    
+    input_mat = round(exp_mat[, c(a, b)])
+    
+    #filter based on percent of samples where genes are detected
+    rf_a = apply(input_mat[,a], 1, function(x)sum(x>0)/length(x))
+    rf_b = apply(input_mat[,b], 1, function(x)sum(x>0)/length(x))
+    k = rf_a> min_fraction | rf_b > min_fraction
+    input_mat = input_mat[k,]
+    rm = apply(input_mat, 1, max)
+    
+    input_mat = input_mat[rm<5e7,]
+    library(BiocFileCache)
+    bfc = BiocFileCache::BiocFileCache()
+    bfcif = ssvRecipes::bfcif
+    res <- bfcif(bfc, paste("DESeq2_v2", digest::digest(list(input_mat, sample_info))), function(){
+        dds = DESeqDataSetFromMatrix(countData = input_mat,
+                               colData = sample_info,
+                               design = ~ group)
+        dds = DESeq(dds)#, parallel = TRUE)
+        as.data.frame(results(dds))
+    })
+ 
+
+    res.sig = subset(res, padj < max_padj & baseMean > min_baseMean & abs(log2FoldChange) > min_log2FoldChange)
+    dim(res.sig)
+    
+    if(FALSE){    
+        gplots::heatmap.2(log10(exp_mat[rownames(res.sig), c(a, b)]+1), trace = "n", 
+                          Colv = FALSE, dendrogram = "row",
+                          ColSideColors = c(rep("purple", length(a)), rep("orange", length(b))), 
+                          key.title = "", density.info = "none", col = viridis::viridis(20), margins = c(16, 10))
+        
+        tmp = log2(exp_mat[rownames(res.sig), c(a, b)]+1)
+        tmp = melt(as.data.table(tmp, id.col = "id", keep.rownames = "id"), id.vars = "id")
+        tmp[, group := ifelse(variable %in% a, "A", "B")]
+        ggplot(tmp[id %in% sample(unique(id), min(9, length(unique(id))))], aes(x = id, y = value, fill = group)) +
+            geom_boxplot() +
+            facet_wrap(~id, scales = "free")
+    }
+    res.sig
+}
+
+# run_tsne = function(exp_mat, genes, perplexity = 20){
+#     library(BiocFileCache)
+#     bfc = BiocFileCache::BiocFileCache()
+#     bfcif = ssvRecipes::bfcif
+#     expression_matrix = exp_mat[genes,]
+#     tsne_patient = ssvRecipes::bfcif(bfc, digest::digest(list(expression_matrix, perplexity)), function(){
+#         Rtsne::Rtsne(t(expression_matrix), 
+#                      num_threads = 20, 
+#                      check_duplicates = FALSE,
+#                      perplexity = perplexity)    
+#     })
+#     
+#     tsne_df = as.data.table(tsne_patient$Y)
+#     colnames(tsne_df) = c("x", "y")
+#     tsne_df$sample_id = colnames(expression_matrix)
+#     tsne_df
+# }
+
+.test_run_DE = function(){
+    #testing vars
+    exp_dt = fread("data/BRCA_TCGA_expression.tiny.csv", sep = ",", header = TRUE)
+    exp_dt = melt(exp_dt, id.vars = "gene_name")
+    exp_dt = exp_dt[, .(value = sum(value)), .(gene_name, variable)]
+    # exp_dt = unique(exp_mat$gene_name[duplicated(exp_mat$gene_name)])
+    exp_dt = dcast(exp_dt, gene_name~variable, value.var = "value")
+    exp_mat = as.matrix(exp_dt[, -1])
+    rownames(exp_mat) = exp_dt$gene_name
+    
+    a = sample(colnames(exp_mat), 20)
+    b = setdiff(colnames(exp_mat), a)
+    
+    run_DE(exp_mat, a, b)
+}

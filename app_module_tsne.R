@@ -19,7 +19,7 @@ run_tsne = function(expression_matrix, perplexity = 30){
     tsne_df$sample_id = colnames(expression_matrix)
     tsne_df
 }
- 
+
 server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes, meta_data, sample_data, code2type, FACET_VAR){
     ### Running t-sne
     
@@ -30,30 +30,40 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
     }, {
         expr_mat = tsne_input()
         gl = valid_genes()
-        if(length(gl) > 0){
+        
+        #choose dimensional reduction method, if possible
+        if(ncol(expr_mat) < 3){
+            showNotification("Too few samples for dimensional reduction.", type = "error")
+            tsne_worked = FALSE
+        }else if(ncol(expr_mat) < 20){
+            browser()
+            pc = prcomp(expr_mat[gl,])
+            tsne_dt = as.data.table(pc$rotation[,1:2], keep.rownames = TRUE)[, c(2:3, 1)]
+            setnames(tsne_dt, c("rn", "PC1", "PC2"), c("sample_id", "x", "y"))
+            tsne_worked = TRUE
+        }else if(length(gl) > 0){
             tsne_worked = tryCatch({
                 tsne_dt = run_tsne(expr_mat[gl,])    
                 TRUE
             }, error = function(e){
-                
                 FALSE
             })
-            if(tsne_worked){
-                samp_dt = sample_data()
-                tsne_dt = merge(tsne_dt, samp_dt, by = "sample_id")
-                tsne_dt[, x := scales::rescale(x, c(-.5, .5))]
-                tsne_dt[, y := scales::rescale(y, c(-.5, .5))]
-                tsne_res(tsne_dt) 
-                
-            }else{
-                showNotification("Need more valid genes/samples to run t-sne.", type = "error")
-                tsne_res(NULL)
-            }
+        }else{
+            tsne_worked = FALSE
+        }
+        
+        if(tsne_worked){
+            samp_dt = sample_data()
+            tsne_dt = merge(tsne_dt, samp_dt, by = "sample_id")
+            tsne_dt[, x := scales::rescale(x, c(-.5, .5))]
+            tsne_dt[, y := scales::rescale(y, c(-.5, .5))]
+            tsne_res(tsne_dt) 
             
         }else{
+            showNotification("Need more valid genes/samples to run t-sne.", type = "error")
             tsne_res(NULL)
         }
-    })
+})
     
     ### Plot t-sne
     output$plot_tsne <- renderPlot({
@@ -89,7 +99,7 @@ server_tsne = function(input, output, session, tsne_res, tsne_input, valid_genes
         }
     })
     
-
+    
     
     tsne_res
-}
+    }

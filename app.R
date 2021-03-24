@@ -53,10 +53,13 @@ ui <- fluidPage(
                      sidebarPanel(
                          selectInput("sel_data", label = "TCGA data", choices = dataset_names),
                          uiOutput("dynamic_sel_sample_type_filter"),
-                         radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)), #c("none", "sample type", "PAM50")),
-                         radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE, selected = "PAM50"),
+                         uiOutput("ui_sel_facet_var"),
+                         uiOutput("ui_sel_gene_list"),
+                         # radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)), #c("none", "sample type", "PAM50")),
+                         # radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE, selected = "PAM50"),
                          disabled((selectInput("sel_custom_gene_set", label = "Custom gene lists", choices = ""))),
-                         radioButtons("sel_color_by", label = "Color By", choices = c("sample type", "PAM50")),
+                         uiOutput("ui_sel_color_by"),
+                         # radioButtons("sel_color_by", label = "Color By", choices = c("sample type", "PAM50")),
                          # radioButtons("sel_facet_by", label = "Facet By", choices = c("sample type", "PAM50")),
                          
                          selectInput("txtGene", label = "Select Gene To Plot", choices = NULL),
@@ -124,6 +127,22 @@ server <- function(input, output, session) {
         # DE_res
     )
     
+    output$ui_sel_facet_var = renderUI({
+        radioButtons("sel_facet_var", label = "Facet By", choices = clean_list(FACET_VAR)) #c("none", "sample type", "PAM50")),    
+    })
+    
+    output$ui_sel_gene_list = renderUI({
+        tagList(
+            radioButtons("sel_gene_list", label = "Gene List", choices = c(names(gene_lists), "custom"), inline = TRUE, selected = "PAM50")#,
+            # disabled((selectInput("sel_custom_gene_set", label = "Custom gene lists", choices = "")))
+        )
+    })
+    
+    output$ui_sel_color_by  = renderUI({
+        radioButtons("sel_color_by", label = "Color By", choices = c("sample type", "PAM50"))
+    })
+    
+    
     
     ## watch gene inputs
     observeEvent({
@@ -150,7 +169,7 @@ server <- function(input, output, session) {
                            selected = active_sample_types)
     })
     
-
+    
     
     
     ##
